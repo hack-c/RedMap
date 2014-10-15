@@ -1,3 +1,4 @@
+import sys
 import argparse
 import itertools
 import string
@@ -70,23 +71,24 @@ def scrape_and_extract(subreddits=subreddits):
     for subred in subreddits:
         posts_dict[subred] = []
 
-        print "==========[ fetching /r/%s ... ]==========\n\n" % (subred)
+        print "\n\n==========[ fetching /r/%s ... ]==========\n" % (subred)
 
         try:
-            all_posts = r.get_subreddit(subred, fetch=True).get_hot(limit=200)
+            all_posts = r.get_subreddit(subred, fetch=True).get_hot(limit=None)
         except Exception:
             continue
 
         for p in all_posts:
+            sys.stdout.write('.')
+            sys.stdout.flush()
             p.replace_more_comments(limit=16)
             flat_comments_list = praw.helpers.flatten_tree(p.comments)
             posts_dict[subred].append(
                 {'title':p.title, 
                 'body':p.selftext, 
-                'comments':[c.body for c in flat_comments]})
-            print('.'),
+                'comments':[c.body for c in flat_comments_list]})
 
-        print "==========[ got %s posts.      ]==========\n\n" % (str(len(posts_dict[subred])))
+        print "\n==========[ got %s posts.      ]==========\n\n" % (str(len(posts_dict[subred])))
 
 
     return posts_dict
@@ -99,7 +101,7 @@ def dump_to_json(posts_dict, fpath="hot_posts.json"):
     print "==========[ saving data to %s ...    ]===========\n\n" % (fpath)
     
     with open(fpath, "wb") as f:
-        json.dump(text, f)
+        json.dump(posts_dict, f)
 
 
 def load_from_json(fpath="hot_posts.json"):
@@ -224,7 +226,7 @@ if __name__ == "__main__":
         if args.subreddit is not None:
             subreddits = args.subreddit.split('+')
         raw_posts = scrape_and_extract (subreddits=subreddits)
-        dump_to_json (posts, fpath='data/hot_posts_raw.json')
+        dump_to_json (raw_posts, fpath='data/hot_posts_raw.json')
     else:
         posts = load_from_json (fpath='data/hot_posts_raw.json')
     

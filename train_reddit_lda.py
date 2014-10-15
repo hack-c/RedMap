@@ -189,7 +189,7 @@ def build_tree(processed_dict):
     """
 
     fdist = get_freqdist(flatten_dict_to_tokens(processed_dict))
-    nodes = fdist.most_common(200)
+    nodes = fdist.most_common(100)
     tree = [['term', 'parent', 'frequency (size)', 'sentiment (color)']]
     for n in nodes:
         tree.append([n[0], '/r/nootropics', n[1], 0])
@@ -197,8 +197,6 @@ def build_tree(processed_dict):
     # TODO: get sentiment
 
     json.dump(tree, open('data/processed/tree.json', 'wb'))
-    return tree 
-
 
 
 
@@ -253,9 +251,9 @@ def train_lda(df, num_topics=200):
 
 
 if __name__ == "__main__":
+    if args.subreddit is not None:
+        subreddits = args.subreddit.split('+')
     if args.scrape:
-        if args.subreddit is not None:
-            subreddits = args.subreddit.split('+')
         raw_posts = scrape_and_extract (subreddits=subreddits)
         dump_to_json (raw_posts, fpath='data/hot_posts_raw.json')
     else:

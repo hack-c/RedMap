@@ -1,4 +1,5 @@
 import argparse
+import itertools
 import string
 import json
 import praw
@@ -15,6 +16,8 @@ from metapython.op.text_preprocessing import join_text_columns
 parser = argparse.ArgumentParser()
 parser.add_argument("-s", "--scrape", help="scrape data fresh",
                     action="store_true")
+parser.add_argument("-r", "--subreddit", help="specify subreddits delimited by +",
+                    action="store")
 args = parser.parse_args()
 
 
@@ -33,9 +36,9 @@ subreddits = ['nootropics',
               'enhance', 
               'tdcs', 
               'selfimprovement', 
-              'gainit', 
+              'gainit',
               'advancedfitness', 
-              'steroids', 
+              'steroids',
               'longevity', 
               'SENS', 
               'Futurism', 
@@ -110,29 +113,59 @@ def load_from_json(fpath="hot_posts.json"):
         return json.load(f)
 
 
-# def load_and_preprocess_dict(posts_dict, subreddits=['nootropics']):
-#     """
-#     normalize and tokenize text using nltk
-#     return a dict
-#     """
-#     table = string.maketrans("","")
-#     processed = {}
-
-#     for subred in subreddits:
-#         tokenized = filter(
-#                         lambda x: x not in useless_words, 
-#                         nltk.word_tokenize(
-#                             ' '.join(
-#                                 [' '.join(
-#                                     [post['title'], post['body'], post['comments']]).lower() for post in posts_dict[subred]
-#                                 ])
-#                             )
-#                         )
 
 
-#     for subred in subreddits:
-#         data = posts_dict['subred']
-        
+
+
+def normalize_tokenize_string(raw_string):
+    """
+    take in a string, return a tokenized and normalized list of words
+    """
+    table = string.maketrans("","")
+    return filter(
+        lambda x: x not in useless_words, 
+        nltk.word_tokenize(raw_string.lower().translate(table, string.punctuation))
+    )
+
+
+def load_and_preprocess_dict(posts_dict, subreddits=['nootropics']):
+    """
+    normalize and tokenize text using nltk
+    return a dict
+    """
+    processed = {}
+    for subred in subreddits:
+        processed[subred] = []
+        for post in posts_dict[subred]:
+            processed[subred].append(
+                {
+                    'title': normalize_tokenize_string(post['title']),
+                    'body': normalize_tokenize_string(post['body']),
+                    'comments': [normalize_tokenize_string(c) for c in post['comments']]
+                }
+            )
+
+    return processed
+
+
+def flatten_dict_to_tokens(tokens_dict):
+    """
+    organized tokens_dict -> long list of tokens
+    """
+    return {k:list(itertools.chain(*[list(itertools.chain(*item.values())) for item in tokens_dict[k]])) for k,v in tokens_dict.iteritems()}
+
+
+def get_freqdist(processed_dict):
+    """
+    takes in tokenized dict, concatenates all lists of terms
+    returns freqdist
+    """
+    return nltk.FreqDist(flatten_dict_to_tokens(processed_dict))
+
+
+def build_tree(processed_dict):
+    fdist = get_freqdist(processed_dict)
+
 
 
 
@@ -188,13 +221,19 @@ def train_lda(df, num_topics=200):
 
 if __name__ == "__main__":
     if args.scrape:
-        posts = scrape_and_extract()
-        dump_to_json (posts)
-        posts = flatten_posts_to_list (posts)
+        if args.subreddit is not None:
+            subreddits = args.subreddit.split('+')
+        raw_posts = scrape_and_extract (subreddits=subreddits)
+        dump_to_json (posts, fpath='data/hot_posts_raw.json')
     else:
-        posts = flatten_posts_to_list( load_from_json() )    
-    df = load_and_preprocess_df (posts)
-    train_lda (df)
+        posts = load_from_json (fpath='data/hot_posts_raw.json')
+    
+    # processed = load_and_preprocess_dict (posts, subreddits=subreddits)
+    # tree      = build_tree(processed)
+
+    # fdist     = get_freqdist(processed)
+
+
 
 
 

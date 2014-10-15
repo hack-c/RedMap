@@ -52,7 +52,7 @@ subreddits = ['nootropics',
               'Neurophilosophy', 
               'SFStories']
 
-useless_words = {'actually', 'also', 'always', 'another', 'anyone', 'anything', 'around', 'back', 'bad', 'book', 'cant', 'could', 'cut', 'david', 'day', 'days', 'different', 'doesnt', 'dont', 'downvoting', '10', 'eating', 'enough', 'even', 'every', 'far', 'feel', 'find', 'first', 'future', 'get', 'getting', 'go', 'going', 'good', 'got', 'great', 'guys', 'gym', 'hard', 'help', 'high', 'human', 'id', 'ill', 'im', 'isnt', 'ive', 'keep', 'know', 'less', 'life', 'like', 'little', 'long', 'look', 'looking', 'lot', 'low', 'made', 'make', 'many', 'may', 'maybe', 'mg', 'might', 'months', 'much', 'need', 'never', 'new', 'one', 'people', 'pretty', 'probably', 'put', 'raises', 'really', 'right', 'say', 'see', 'someone', 'something', 'start', 'started', 'still', 'sub', 'sure', 'take', 'taking', 'test', 'thats', 'thing', 'things', 'think', 'though', 'time', 'try', 'two', 'us', 'use', 'using', 'want', 'way', 'week', 'weeks', 'well', 'without', 'wont', 'work', 'world', 'would', 'years', 'youre'}
+useless_words = {'1', '2', '3', '4', '5', 'actually', 'also', 'always', 'another', 'anyone', 'anything', 'around', 'back', 'bad', 'book', 'cant', 'could', 'cut', 'david', 'day', 'days', 'different', 'doesnt', 'dont', 'downvoting', '10', 'eating', 'enough', 'even', 'every', 'far', 'feel', 'find', 'first', 'future', 'get', 'getting', 'go', 'going', 'good', 'got', 'great', 'guys', 'gym', 'hard', 'help', 'high', 'human', 'id', 'ill', 'im', 'isnt', 'ive', 'keep', 'know', 'less', 'life', 'like', 'little', 'long', 'look', 'looking', 'lot', 'low', 'made', 'make', 'many', 'may', 'maybe', 'mg', 'might', 'months', 'much', 'need', 'never', 'new', 'one', 'people', 'pretty', 'probably', 'put', 'raises', 'really', 'right', 'say', 'see', 'someone', 'something', 'start', 'started', 'still', 'sub', 'sure', 'take', 'taking', 'test', 'thats', 'thing', 'things', 'think', 'though', 'time', 'try', 'two', 'us', 'use', 'using', 'want', 'way', 'week', 'weeks', 'well', 'without', 'wont', 'work', 'world', 'would', 'years', 'youre'}
 useless_words = set(nltk.corpus.stopwords.words('english') + list(useless_words))
 
 def scrape_and_extract(subreddits=subreddits):
@@ -158,23 +158,46 @@ def load_and_preprocess_dict(posts_dict, subreddits=['nootropics']):
     return processed
 
 
+def flatten_post_to_tokens(post_dict):
+    """
+    post_dict -> list of tokens
+    """
+    return post_dict['title'] + post_dict['body'] + list(itertools.chain(*post_dict['comments']))
+
+
 def flatten_dict_to_tokens(tokens_dict):
     """
     organized tokens_dict -> long list of tokens
     """
-    return {k:list(itertools.chain(*[list(itertools.chain(*item.values())) for item in tokens_dict[k]])) for k,v in tokens_dict.iteritems()}
+    flattened = {}
+    for subred in tokens_dict.keys():
+        flattened[subred] = list(itertools.chain(*[flatten_post_to_tokens(post) for post in tokens_dict[subred]]))
+    return flattened
 
-
-def get_freqdist(processed_dict):
+def get_freqdist(tokenized_doc):
     """
     takes in tokenized dict, concatenates all lists of terms
     returns freqdist
     """
-    return nltk.FreqDist(flatten_dict_to_tokens(processed_dict))
+    return nltk.FreqDist(tokenized_doc)
 
 
 def build_tree(processed_dict):
-    fdist = get_freqdist(processed_dict)
+    """
+    taken organized tokens_dict, get freqdist, build tree with tf and sentiment values
+    dump to json
+    """
+
+    fdist = get_freqdist(flatten_dict_to_tokens(processed_dict))
+    nodes = fdist.most_common(200)
+    tree = [['term', 'parent', 'frequency (size)', 'sentiment (color)']]
+    for n in nodes:
+        tree.append([n[0], '/r/nootropics', n[1], 0])
+
+    # TODO: get sentiment
+
+    json.dump(tree, open('data/processed/tree.json', 'wb'))
+    return tree 
 
 
 
@@ -238,11 +261,8 @@ if __name__ == "__main__":
     else:
         posts = load_from_json (fpath='data/hot_posts_raw.json')
     
-    # processed = load_and_preprocess_dict (posts, subreddits=subreddits)
-    # tree      = build_tree(processed)
-
-    # fdist     = get_freqdist(processed)
-
+    processed = load_and_preprocess_dict (posts, subreddits=subreddits)
+    tree      = build_tree(processed)
 
 
 

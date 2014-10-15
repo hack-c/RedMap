@@ -109,12 +109,14 @@ def load_from_json(fpath="hot_posts.json"):
     loads crawled posts from .json file
     returns dict 
     """
-    print "\n\n====================[ loading data from %s ... ]====================\n\n" % (fpath)
+    print "\n\n====================[ loading data from %s ... ]====================\n" % (fpath)
     
     with open(fpath, "rb") as f:
-        return json.load(f)
+        return_dict = json.load(f)
+        print "====================[ done.                                        ]=====================\n\n"
+        return return_dict
 
-    print "====================[ done.                                    ]=====================\n\n"
+
 
 
 
@@ -124,10 +126,11 @@ def normalize_tokenize_string(raw_string):
     """
     take in a string, return a tokenized and normalized list of words
     """
-    table = string.maketrans("","")
+    table = {ord(c): None for c in string.punctuation}
+    assert isinstance(raw_string, unicode)
     return filter(
         lambda x: x not in useless_words, 
-        nltk.word_tokenize(raw_string.lower().translate(table, string.punctuation))
+        nltk.word_tokenize(raw_string.lower().translate(table))
     )
 
 
@@ -138,8 +141,11 @@ def load_and_preprocess_dict(posts_dict, subreddits=['nootropics']):
     """
     processed = {}
     for subred in subreddits:
+        print "normalizing /r/%s ...\n\n" % (subred)
         processed[subred] = []
         for post in posts_dict[subred]:
+            sys.stdout.write('.')
+            sys.stdout.flush()
             processed[subred].append(
                 {
                     'title': normalize_tokenize_string(post['title']),
@@ -148,6 +154,7 @@ def load_and_preprocess_dict(posts_dict, subreddits=['nootropics']):
                 }
             )
 
+    print "\n\ndone."
     return processed
 
 

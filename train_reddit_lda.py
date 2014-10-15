@@ -1,10 +1,7 @@
 import sys
 import argparse
-import itertools
-import string
 import json
 import praw
-import nltk
 import gensim
 import pandas as pd
 
@@ -118,88 +115,6 @@ def load_from_json(fpath="hot_posts.json"):
 
 
 
-
-
-
-
-def normalize_tokenize_string(raw_string):
-    """
-    take in a string, return a tokenized and normalized list of words
-    """
-    table = {ord(c): None for c in string.punctuation}
-    assert isinstance(raw_string, unicode)
-    return filter(
-        lambda x: x not in useless_words, 
-        nltk.word_tokenize(raw_string.lower().translate(table))
-    )
-
-
-def load_and_preprocess_dict(posts_dict, subreddits=['nootropics']):
-    """
-    normalize and tokenize text using nltk
-    return a dict
-    """
-    processed = {}
-    for subred in subreddits:
-        print "normalizing /r/%s ...\n\n" % (subred)
-        processed[subred] = []
-        for post in posts_dict[subred]:
-            sys.stdout.write('.')
-            sys.stdout.flush()
-            processed[subred].append(
-                {
-                    'title': normalize_tokenize_string(post['title']),
-                    'body': normalize_tokenize_string(post['body']),
-                    'comments': [normalize_tokenize_string(c) for c in post['comments']]
-                }
-            )
-
-    print "\n\ndone."
-    return processed
-
-
-def flatten_post_to_tokens(post_dict):
-    """
-    post_dict -> list of tokens
-    """
-    return post_dict['title'] + post_dict['body'] + list(itertools.chain(*post_dict['comments']))
-
-
-def flatten_dict_to_tokens(tokens_dict):
-    """
-    organized tokens_dict -> long list of tokens
-    """
-    flattened = {}
-    for subred in tokens_dict.keys():
-        flattened[subred] = list(itertools.chain(*[flatten_post_to_tokens(post) for post in tokens_dict[subred]]))
-    return flattened
-
-def get_freqdist(tokenized_doc):
-    """
-    takes in tokenized dict, concatenates all lists of terms
-    returns freqdist
-    """
-    return nltk.FreqDist(tokenized_doc)
-
-
-def build_tree(processed_dict):
-    """
-    taken organized tokens_dict, get freqdist, build tree with tf and sentiment values
-    dump to json
-    """
-
-    fdist = get_freqdist(flatten_dict_to_tokens(processed_dict))
-    nodes = fdist.most_common(100)
-    tree = [['term', 'parent', 'frequency (size)', 'sentiment (color)']]
-    for n in nodes:
-        tree.append([n[0], '/r/nootropics', n[1], 0])
-
-    # TODO: get sentiment
-
-    json.dump(tree, open('data/processed/tree.json', 'wb'))
-
-
-
 def flatten_posts_to_list(posts_dict):
     """
     we saved the posts indexed by subreddit, but we might want to train a model on the _whole damn thang_
@@ -257,10 +172,11 @@ if __name__ == "__main__":
         raw_posts = scrape_and_extract (subreddits=subreddits)
         dump_to_json (raw_posts, fpath='data/hot_posts_raw.json')
     else:
-        posts = load_from_json (fpath='data/hot_posts_raw.json')
+        posts = flatten_post_to_list( load_from_json (fpath='data/hot_posts_raw.json') )
     
-    processed = load_and_preprocess_dict (posts, subreddits=subreddits)
-    tree      = build_tree(processed)
+    df = load_and_preprocess_df (posts)
+    train_lda (df)
+
 
 
 

@@ -1,0 +1,31 @@
+<html>
+  <head>
+    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+    <script type="text/javascript">
+      google.load("visualization", "1", {packages:["treemap"]});
+      google.setOnLoadCallback(drawChart);
+      function drawChart() {
+        $.getJSON('data/processed/tree.json')
+          .done(function(data){
+            tree_data = data;
+          });
+        var data = google.visualization.arrayToDataTable(tree_data);
+
+        tree = new google.visualization.TreeMap(document.getElementById('chart_div'));
+
+        tree.draw(data, {
+          minColor: '#f00',
+          midColor: '#ddd',
+          maxColor: '#0d0',
+          headerHeight: 15,
+          fontColor: 'black',
+          showScale: true
+        });
+
+      }
+    </script>
+  </head>
+  <body>
+    <div id="chart_div" style="width: 900px; height: 500px;"></div>
+  </body>
+</html>

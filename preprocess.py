@@ -64,7 +64,7 @@ def scrape_and_extract(subreddits=subreddits):
     posts_dict = {}
 
     for subred in subreddits:
-        posts_dict[subred] = []
+        posts_dict[subred] = {}
 
         print "\n\n====================[ fetching /r/%s ...                       ]====================\n" % (subred)
 
@@ -78,10 +78,12 @@ def scrape_and_extract(subreddits=subreddits):
             sys.stdout.flush()
             p.replace_more_comments(limit=16)
             flat_comments_list = praw.helpers.flatten_tree(p.comments)
-            posts_dict[subred].append(
-                {'title':p.title, 
-                'body':p.selftext, 
-                'comments':[c.body for c in flat_comments_list]})
+            posts_dict[subred][p.id] = {
+                'title':p.title,
+                'body':p.selftext,
+                'score':p.score if len(p.selftext) > 10 else None,
+                'url':p.short_link,
+                'comments':{c.id: {'body':c.body, 'score':c.score} for c in flat_comments_list}}
 
         print "\n====================[ got %s posts.                            ]====================\n\n" % (str(len(posts_dict[subred])))
 
@@ -111,7 +113,14 @@ def load_from_json(fpath="hot_posts.json"):
         print "====================[ done.                                        ]=====================\n\n"
         return return_dict
 
+def dump_text_to_json(posts_dict, fpath="data/raw/raw_text.json"):
+    """
+    extracts just the text from each post and its comments
+    prepends a 'sentence' with just the id, for doing lookups later
+    writes to a file.
+    one 'body' per line (perhaps with multiple sentences.)
 
+    """
 
 
 
@@ -184,7 +193,7 @@ def build_tree(processed_dict):
     """
 
     fdist = get_freqdist(flatten_dict_to_tokens(processed_dict))
-    nodes = fdist.most_common(100)
+    nodes = fdist.most_common(200)
     tree = [['term', 'parent', 'frequency (size)', 'sentiment (color)']]
     for n in nodes:
         tree.append([n[0], '/r/nootropics', n[1], 0])
@@ -209,11 +218,11 @@ if __name__ == "__main__":
         subreddits = args.subreddit.split('+')
     if args.scrape:
         raw_posts = scrape_and_extract (subreddits=subreddits)
-        dump_to_json (raw_posts, fpath='data/hot_posts_raw.json')
+        dump_to_json (raw_posts, fpath='data/hot_posts_raw_with_id.json')
     else:
-        posts = load_from_json (fpath='data/hot_posts_raw.json')
+        raw_posts = load_from_json (fpath='data/hot_posts_raw_with_id.json')
     
-    processed = load_and_preprocess_dict (posts, subreddits=subreddits)
+    processed = load_and_preprocess_dict (raw_posts, subreddits=subreddits)
     tree      = build_tree(processed)
 
 

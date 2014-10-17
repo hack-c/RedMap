@@ -98,6 +98,8 @@ def compute_mean_sentiments(sentiments_dict):
 
 if __name__ == "__main__":
 
+    dump_json_to_raw_text('data/raw/hot_posts_raw_with_id.json', 'data/raw/bodytext')
+
 
 
 

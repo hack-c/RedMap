@@ -17,40 +17,40 @@ parser.add_argument("-r", "--subreddit", help="specify subreddits delimited by +
 args = parser.parse_args()
 
 
-subreddits = ['nootropics', 
-              'nutrition', 
-              'Health', 
-              'FixMyDiet', 
-              'Dietetics', 
-              'supplements', 
-              'stackadvice', 
-              'afinil', 
-              'drugnerds', 
-              'foodnerds', 
-              'caffeine', 
-              'braintraining', 
-              'enhance', 
-              'tdcs', 
-              'selfimprovement', 
-              'gainit',
-              'advancedfitness', 
-              'steroids',
-              'longevity', 
-              'SENS', 
-              'Futurism', 
-              'Futurology', 
-              'Posthumanism', 
-              'Singularitarianism', 
-              'Singularity', 
-              'Transhuman', 
-              'Transhumanism', 
-              'Neurophilosophy', 
-              'SFStories']
+# subreddits = ['nootropics', 
+#               'nutrition', 
+#               'Health', 
+#               'FixMyDiet', 
+#               'Dietetics', 
+#               'supplements', 
+#               'stackadvice', 
+#               'afinil', 
+#               'drugnerds', 
+#               'foodnerds', 
+#               'caffeine', 
+#               'braintraining', 
+#               'enhance', 
+#               'tdcs', 
+#               'selfimprovement', 
+#               'gainit',
+#               'advancedfitness', 
+#               'steroids',
+#               'longevity', 
+#               'SENS', 
+#               'Futurism', 
+#               'Futurology', 
+#               'Posthumanism', 
+#               'Singularitarianism', 
+#               'Singularity', 
+#               'Transhuman', 
+#               'Transhumanism', 
+#               'Neurophilosophy', 
+#               'SFStories']
 
 useless_words = {'1', '2', '3', '4', '5', 'actually', 'also', 'always', 'another', 'anyone', 'anything', 'around', 'back', 'bad', 'book', 'cant', 'could', 'cut', 'david', 'day', 'days', 'different', 'doesnt', 'dont', 'downvoting', '10', 'eating', 'enough', 'even', 'every', 'far', 'feel', 'find', 'first', 'future', 'get', 'getting', 'go', 'going', 'good', 'got', 'great', 'guys', 'gym', 'hard', 'help', 'high', 'human', 'id', 'ill', 'im', 'isnt', 'ive', 'keep', 'know', 'less', 'life', 'like', 'little', 'long', 'look', 'looking', 'lot', 'low', 'made', 'make', 'many', 'may', 'maybe', 'mg', 'might', 'months', 'much', 'need', 'never', 'new', 'one', 'people', 'pretty', 'probably', 'put', 'raises', 'really', 'right', 'say', 'see', 'someone', 'something', 'start', 'started', 'still', 'sub', 'sure', 'take', 'taking', 'test', 'thats', 'thing', 'things', 'think', 'though', 'time', 'try', 'two', 'us', 'use', 'using', 'want', 'way', 'week', 'weeks', 'well', 'without', 'wont', 'work', 'world', 'would', 'years', 'youre'}
 useless_words = set(nltk.corpus.stopwords.words('english') + list(useless_words))
 
-def scrape_and_extract(subreddits=subreddits):
+def scrape_and_extract(subreddits):
     """
     pulls down hot 200 posts for each subreddit
     gets title, body, and comments
@@ -113,6 +113,7 @@ def load_from_json(fpath="hot_posts.json"):
         print "====================[ done.                                        ]=====================\n\n"
         return return_dict
 
+
 def dump_text_to_json(posts_dict, fpath="data/raw/raw_text.json"):
     """
     extracts just the text from each post and its comments
@@ -138,35 +139,37 @@ def normalize_tokenize_string(raw_string):
     )
 
 
-def load_and_preprocess_dict(posts_dict, subreddits=['nootropics']):
+def load_and_preprocess_dict(posts_dict, subreddits):
     """
     normalize and tokenize text using nltk
     return a dict
     """
-    processed = {}
+
     for subred in subreddits:
+        
         print "normalizing /r/%s ...\n\n" % (subred)
-        processed[subred] = []
-        for post in posts_dict[subred]:
+        
+        for post_id, post in posts_dict[subred].iteritems():
             sys.stdout.write('.')
             sys.stdout.flush()
-            processed[subred].append(
-                {
+            posts_dict[subred][post_id]['tokenized'] = {
                     'title': normalize_tokenize_string(post['title']),
                     'body': normalize_tokenize_string(post['body']),
-                    'comments': [normalize_tokenize_string(c) for c in post['comments']]
+                    'score': post['score'],
+                    'url': post['url'],
+                    'comments': {c_id: {'body': normalize_tokenize_string(c['body']), 'score': c['score']} for c_id, c in post['comments'].iteritems()}
                 }
-            )
+            
 
     print "\n\ndone."
-    return processed
+    return posts_dict
 
 
-def flatten_post_to_tokens(post_dict):
+def flatten_post_to_tokens(tokenized_post_dict):
     """
     post_dict -> list of tokens
     """
-    return post_dict['title'] + post_dict['body'] + list(itertools.chain(*post_dict['comments']))
+    return tokenized_post_dict['title'] + tokenized_post_dict['body'] + list(itertools.chain(*[tokenized_post_dict['comments'][k]['body'] for k in tokenized_post_dict['comments'].keys()]))
 
 
 def flatten_dict_to_tokens(tokens_dict):
@@ -175,7 +178,7 @@ def flatten_dict_to_tokens(tokens_dict):
     """
     flattened = {}
     for subred in tokens_dict.keys():
-        flattened[subred] = list(itertools.chain(*[flatten_post_to_tokens(post) for post in tokens_dict[subred]]))
+        flattened[subred] = list(itertools.chain(*[flatten_post_to_tokens(post['tokenized']) for post in tokens_dict[subred].values()]))
     return flattened
 
 def get_freqdist(tokenized_doc):
@@ -218,12 +221,16 @@ if __name__ == "__main__":
         subreddits = args.subreddit.split('+')
     if args.scrape:
         raw_posts = scrape_and_extract (subreddits=subreddits)
-        dump_to_json (raw_posts, fpath='data/hot_posts_raw_with_id.json')
+        dump_to_json (raw_posts, fpath='data/hot_posts_raw_with_id1.json')
     else:
-        raw_posts = load_from_json (fpath='data/hot_posts_raw_with_id.json')
+        raw_posts = load_from_json (fpath='data/hot_posts_raw_with_id1.json')
     
-    processed = load_and_preprocess_dict (raw_posts, subreddits=subreddits)
-    tree      = build_tree(processed)
+    subreddits = raw_posts.keys() # this is a hack, should fix this somehow...
+    processed  = load_and_preprocess_dict (raw_posts, subreddits=subreddits)
+    flattened  = flatten_dict_to_tokens (processed)
+    
+
+    #tree      = build_tree(processed)
 
 
 

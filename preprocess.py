@@ -8,6 +8,8 @@ import nltk
 import gensim
 import pandas as pd
 
+from sklearn.feature_extraction.text import TfidfVectorizer
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-s", "--scrape", help="scrape data fresh",
@@ -47,7 +49,7 @@ args = parser.parse_args()
 #               'Neurophilosophy', 
 #               'SFStories']
 
-useless_words = {'1', '2', '3', '4', '5', 'actually', 'also', 'always', 'another', 'anyone', 'anything', 'around', 'back', 'bad', 'book', 'cant', 'could', 'cut', 'david', 'day', 'days', 'different', 'doesnt', 'dont', 'downvoting', '10', 'eating', 'enough', 'even', 'every', 'far', 'feel', 'find', 'first', 'future', 'get', 'getting', 'go', 'going', 'good', 'got', 'great', 'guys', 'gym', 'hard', 'help', 'high', 'human', 'id', 'ill', 'im', 'isnt', 'ive', 'keep', 'know', 'less', 'life', 'like', 'little', 'long', 'look', 'looking', 'lot', 'low', 'made', 'make', 'many', 'may', 'maybe', 'mg', 'might', 'months', 'much', 'need', 'never', 'new', 'one', 'people', 'pretty', 'probably', 'put', 'raises', 'really', 'right', 'say', 'see', 'someone', 'something', 'start', 'started', 'still', 'sub', 'sure', 'take', 'taking', 'test', 'thats', 'thing', 'things', 'think', 'though', 'time', 'try', 'two', 'us', 'use', 'using', 'want', 'way', 'week', 'weeks', 'well', 'without', 'wont', 'work', 'world', 'would', 'years', 'youre'}
+useless_words = {'1', '2', '3', '4', '5', 'actually', 'also', 'always', 'another', 'anyone', 'anything', 'around', 'back', 'bad', 'book', 'cant', 'could', 'cut', 'david', 'day', 'days', 'different', 'doesnt', 'dont', 'downvoting', '10', 'eating', 'enough', 'even', 'every', 'far', 'feel', 'find', 'first', 'future', 'get', 'getting', 'go', 'going', 'good', 'got', 'great', 'gt', 'guys', 'gym', 'hard', 'help', 'high', 'human', 'id', 'ill', 'im', 'isnt', 'ive', 'keep', 'know', 'less', 'life', 'like', 'little', 'long', 'look', 'looking', 'lot', 'low', 'made', 'make', 'many', 'may', 'maybe', 'mg', 'might', 'months', 'much', 'need', 'never', 'new', 'one', 'people', 'pretty', 'probably', 'put', 'raises', 'really', 'right', 'say', 'see', 'someone', 'something', 'start', 'started', 'still', 'sub', 'sure', 'take', 'taking', 'test', 'thats', 'thing', 'things', 'think', 'though', 'time', 'try', 'two', 'us', 'use', 'using', 'want', 'way', 'week', 'weeks', 'well', 'without', 'wont', 'work', 'world', 'would', 'years', 'youre'}
 useless_words = set(nltk.corpus.stopwords.words('english') + list(useless_words))
 
 def scrape_and_extract(subreddits):
@@ -147,7 +149,7 @@ def load_and_preprocess_dict(posts_dict, subreddits):
 
     for subred in subreddits:
         
-        print "normalizing /r/%s ...\n\n" % (subred)
+        print "\n\nnormalizing /r/%s ...\n\n" % (subred)
         
         for post_id, post in posts_dict[subred].iteritems():
             sys.stdout.write('.')
@@ -206,13 +208,24 @@ def build_tree(processed_dict):
     json.dump(tree, open('data/processed/tree.json', 'wb'))
 
 
+def build_gensim_corpus(processed_dict):
+    """
+    iterate over the large dict with ['tokenized'] posts
+    append lists of tokens for post titles + bodies and 
+    
+    """
 
-def flatten_posts_to_list(posts_dict):
-    """
-    we saved the posts indexed by subreddit, but we might want to train a model on the _whole damn thang_
-    this flattens the dict into a single list
-    """
-    return [item for sublist in [posts_dict[item] for item in subreddits] for item in sublist]
+    texts = []
+
+
+
+
+# def flatten_posts_to_list(posts_dict):
+    # """
+    # we saved the posts indexed by subreddit, but we might want to train a model on the _whole damn thang_
+    # this flattens the dict into a single list
+    # """
+    # return [item for sublist in [posts_dict[item] for item in subreddits] for item in sublist]
 
 
 
@@ -221,16 +234,50 @@ if __name__ == "__main__":
         subreddits = args.subreddit.split('+')
     if args.scrape:
         raw_posts = scrape_and_extract (subreddits=subreddits)
-        dump_to_json (raw_posts, fpath='data/hot_posts_raw_with_id1.json')
+        dump_to_json (raw_posts, fpath='data/raw/hot_id_10-21-2014.json')
     else:
-        raw_posts = load_from_json (fpath='data/hot_posts_raw_with_id1.json')
+        raw_posts = load_from_json (fpath='data/raw/hot_id_10-21-2014.json')
     
     subreddits = raw_posts.keys() # this is a hack, should fix this somehow...
     processed  = load_and_preprocess_dict (raw_posts, subreddits=subreddits)
     flattened  = flatten_dict_to_tokens (processed)
-    
+    doc_map    = dict(list(enumerate(flattened.keys())))
+    texts      = flattened.values()
 
-    #tree      = build_tree(processed)
+    dictionary = gensim.corpora.Dictionary(texts)
+    once_ids = [tokenid for tokenid, docfreq in dictionary.dfs.iteritems() if docfreq == 1]
+    dictionary.filter_tokens(once_ids)
+    dictionary.compactify()
+    dictionary.save('data/processed/flattened_subreddits.dict')
+    corpus = [dictionary.doc2bow(text) for text in texts]
+    gensim.corpora.MmCorpus.serialize('data/processed/flattened_subreddits.mm', corpus)
+    corpus = gensim.corpora.MmCorpus('data/processed/flattened_subreddits.mm')
+    tfidf = gensim.models.TfidfModel(corpus)
+    corpus_tfidf = tfidf[corpus]
+    lsi = gensim.models.LsiModel(corpus_tfidf, id2word=dictionary, num_topics=300)
+    corpus_lsi = lsi[corpus_tfidf]
+    vec_bow = dictionary.doc2bow(flattened['nootropics'])
+    vec_lsi = lsi[vec_bow]
+    index = gensim.similarities.MatrixSimilarity(lsi[corpus])    
+    index.save('data/processed/flattened_subreddits_lsi.index')
+    sims = index[vec_lsi]
+    sims = sorted(enumerate(sims), key=lambda item: -item[1])
+
+    for (i, sim) in sims:
+        processed[doc_map[i]]['similarity_to_nootropics'] = sim
+
+    for i, doc in enumerate(corpus_tfidf):
+        top_100_terms = sorted(doc, key=lambda item: item[1], reverse=True)[:100]
+        processed[doc_map[i]]['top_100_tfidf_terms'] = [(dictionary.id2token[i], simil) for (i, simil) in top_100_terms]
+
+    dump_to_json(processed, fpath='data/processed/tfidfs_and_sims.json')
+
+
+
+
+
+
+
 
 
 

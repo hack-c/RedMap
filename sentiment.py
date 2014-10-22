@@ -101,7 +101,7 @@ def dump_mentions_to_raw_text(terms, processed_dict, outdir):
             files_written += 1
             lines_written  = 0
             outfile = open(outdir + '/raw_bodies_%i.txt' % (files_written), 'wb')
-            print "\n\nwriting to file %i ... \n\n" % (files_written)
+            print "\n\nwriting file %i... \n\n" % (files_written)
 
         outfile.write(line)
         lines_written       += 1

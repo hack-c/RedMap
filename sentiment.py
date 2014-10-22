@@ -1,12 +1,79 @@
 import sys
+import argparse
 import json
+
 from corenlp import batch_parse
+from preprocess import load_from_json
 
 corenlpdir = '../corenlp-python/stanford-corenlp-full-2014-08-27/'
 raw_text_dir = 'data/raw/bodytext'
 
+parser = argparse.ArgumentParser()
+parser.add_argument("-p", "--preprocessed", help="path to preprocessed json file",
+                    action="store")
+args = parser.parse_args()
 
-def dump_json_to_raw_text(inpath, outdir):
+
+def remove_nonascii(s):
+    """
+    strip out nonascii chars
+    """
+    return "".join(i for i in s if ord(i)<128)
+
+
+def build_lines_body(post_id, post):
+    """
+    format string to write for post body
+    """
+    return ["UNIQQQID " + post_id + ". " + remove_nonascii(post['body']) + "\n\n"] if len(post['body']) > 10 else []
+
+
+def build_lines_comment(post_id, comment_id, post):
+    """
+    format string for a single comment
+    """
+    return ["UNIQQQID " + post_id + ":" + comment_id + ". " + remove_nonascii(post['comments'][comment_id]['body']) + "\n\n"]
+
+
+def build_lines_whole_post(post_id, post):
+    """
+    take in unique post id
+    return list of strings in proper format
+    """
+
+    body_line     = build_line_body(post_id, post)
+    comment_lines = [build_line_comment(post_id, comment_id, post) for comment_id in post['comments'].keys()]
+
+    return body_line + comment_lines
+
+
+def find_mentions(terms, processed_dict):
+    """
+    iterates over processed data object,
+    if one of terms occurs in post or comment body,
+    build line and append to list
+    return list of lines to be written to text file
+    """
+    lines = []
+
+    print "\n\nfinding mentions..."
+
+    for post_id, post in processed_dict['nootropics']['posts'].iteritems():
+        sys.stdout.write('.')
+        sys.stdout.flush()
+
+        if terms.intersection(set(post['tokenized']['title'] + post['tokenized']['body'])):
+           lines.extend(build_lines_body(post_id, post))
+
+        for comment_id, comment in post['tokenized']['comments'].iteritems():
+            if terms.intersection(set(comment)):
+                lines.extend(build_lines_comment(post_id, comment_id, post))
+
+    return lines 
+
+
+
+def dump_mentions_to_raw_text(terms, processed_dict, outdir):
     """
     load json from inpath
     for each post body, write line:
@@ -15,49 +82,34 @@ def dump_json_to_raw_text(inpath, outdir):
         UNIQQQID asdf3:sdfg4. <body>
     do batches of 100 bodies per file.
     """
-    raw_posts     = json.load(open(inpath, 'rb'))
-    outfile       = open(outdir + '/raw_bodies_1.txt', 'wb')
 
-    lines_written = 0
-    files_written = 1
+    outfile              = open(outdir + '/raw_bodies_1.txt', 'wb')
+    lines_written        = 0
+    files_written        = 1
+    total_lines_written  = 0
 
-    print "\n\nwriting to file %i ... \n\n" % (files_written)
 
-    for subred in raw_posts.keys():
-        for post_id, post in raw_posts[subred].iteritems():
-            sys.stdout.write('.')
-            sys.stdout.flush()
+    print "\n\nwriting to file %i... \n" % (files_written)
 
-            if lines_written > 100:
-                outfile.close()
-                print "\n\nfile %i done.\n\n" % (files_written)
-                files_written += 1
-                lines_written  = 0
-                outfile = open(outdir + '/raw_bodies_%i.txt' % (files_written), 'wb')
-                print "\n\nwriting to file %i ... \n\n" % (files_written)
+    for line in find_mentions(terms, processed_dict):
+        sys.stdout.write('.')
+        sys.stdout.flush()
 
-            lines = build_lines(post_id, post)
-            outfile.writelines(lines)
-            lines_written += len(lines)
+        if lines_written > 100:
+            outfile.close()
+            print "\n\nfile %i done.\n\n" % (files_written)
+            files_written += 1
+            lines_written  = 0
+            outfile = open(outdir + '/raw_bodies_%i.txt' % (files_written), 'wb')
+            print "\n\nwriting to file %i ... \n\n" % (files_written)
+
+        outfile.write(line)
+        lines_written       += 1
+        total_lines_written += 1
+
+    print "\n\nwrote %i lines." % (total_lines_written)
 
     outfile.close()
-
-
-def build_lines(post_id, post):
-    """
-    take in unique post id
-    return list of strings in proper format
-    """
-    def remove_nonascii(s):
-        """
-        strip out nonascii chars
-        """
-        return "".join(i for i in s if ord(i)<128)
-
-    body_line     = ["UNIQQQID " + post_id + ". " + remove_nonascii(post['body']) + "\n\n"] if len(post['body']) > 10 else []
-    comment_lines = ["UNIQQQID " + post_id + ":" + comment_id + ". " + remove_nonascii(comment['body']) + "\n\n" for comment_id, comment in post['comments'].iteritems()]
-
-    return body_line + comment_lines
 
 
 
@@ -73,8 +125,8 @@ def parse_raw_text(raw_text_dir):
     sentiments      = get_sentiments(parse_tree)
     mean_sentiments = compute_mean_sentiments(sentiments)
 
-    print "saving ...\n\n"
-    json.dump(mean_sentiments, "data/processed/sentiments_dict.json")
+    print "\n\nsaving ...\n\n"
+    json.dump(mean_sentiments, open("data/processed/sentiments_dict.json", 'wb'))
     print "done."
 
     return mean_sentiments 
@@ -120,8 +172,17 @@ def compute_mean_sentiments(sentiments_dict):
 
 if __name__ == "__main__":
 
-    # dump_json_to_raw_text('data/raw/hot_posts_raw_with_id.json', 'data/raw/bodytext')
+    if args.preprocessed is not None:
+        processed = load_from_json(args.preprocessed)
+
+    terms = set(processed['nootropics']['top_100_tfidf_terms'].keys()[:20])
+    dump_mentions_to_raw_text(terms, processed, 'data/raw/bodytext')
     parse_raw_text('data/raw/bodytext')
+
+
+
+    # dump_json_to_raw_text('data/raw/hot_posts_raw_with_id.json', 'data/raw/bodytext')
+    # parse_raw_text('data/raw/bodytext')
 
 
 

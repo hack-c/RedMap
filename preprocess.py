@@ -82,7 +82,7 @@ def scrape_and_extract(subreddits):
             sys.stdout.flush()
             p.replace_more_comments(limit=16)
             flat_comments_list = praw.helpers.flatten_tree(p.comments)
-            posts_dict[subred][p.id] = {
+            posts_dict[subred]['posts'][p.id] = {
                 'title':p.title,
                 'body':p.selftext,
                 'score':p.score if len(p.selftext) > 10 else None,
@@ -153,10 +153,10 @@ def load_and_preprocess_dict(posts_dict, subreddits):
         
         print "\n\n\nnormalizing /r/%s ...\n" % (subred)
         
-        for post_id, post in posts_dict[subred].iteritems():
+        for post_id, post in posts_dict[subred]['posts'].iteritems():
             sys.stdout.write('.')
             sys.stdout.flush()
-            posts_dict[subred][post_id]['tokenized'] = {
+            posts_dict[subred]['posts'][post_id]['tokenized'] = {
                     'title': normalize_tokenize_string(post['title']),
                     'body': normalize_tokenize_string(post['body']),
                     'score': post['score'],
@@ -182,7 +182,7 @@ def flatten_dict_to_tokens(tokens_dict):
     """
     flattened = {}
     for subred in tokens_dict.keys():
-        flattened[subred] = list(itertools.chain(*[flatten_post_to_tokens(post['tokenized']) for post in tokens_dict[subred].values()]))
+        flattened[subred] = list(itertools.chain(*[flatten_post_to_tokens(post['tokenized']) for post in tokens_dict[subred]['posts'].values()]))
     return flattened
 
 def get_freqdist(tokenized_doc):
@@ -235,11 +235,11 @@ if __name__ == "__main__":
         subreddits = args.subreddit.split('+')
     if args.scrape:
         raw_posts = scrape_and_extract (subreddits=subreddits)
-        dump_to_json (raw_posts, fpath='data/raw/hot_id_10-21-2014.json')
+        dump_to_json (raw_posts, fpath='data/raw/hot_10-22-2014.json')
     if args.preprocessed is not None:
         processed = load_from_json(fpath=args.preprocessed)
     else:
-        raw_posts = load_from_json (fpath='data/raw/hot_id_10-21-2014.json')
+        raw_posts = load_from_json (fpath='data/raw/hot_10-22-2014.json')
         subreddits = raw_posts.keys() # this is a hack, should fix this somehow...
         processed  = load_and_preprocess_dict (raw_posts, subreddits=subreddits)
         dump_to_json (processed, fpath='data/processed/hot_tokenized_10-21-2014.json')

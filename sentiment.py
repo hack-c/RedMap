@@ -11,6 +11,8 @@ raw_text_dir = 'data/raw/bodytext'
 parser = argparse.ArgumentParser()
 parser.add_argument("-p", "--preprocessed", help="path to preprocessed json file",
                     action="store")
+parser.add_argument("-t", "--parse-tree", help="path to preprocessed parse tree",
+                    action="store")
 args = parser.parse_args()
 
 
@@ -66,7 +68,7 @@ def find_mentions(terms, processed_dict):
            lines.extend(build_lines_body(post_id, post))
 
         for comment_id, comment in post['tokenized']['comments'].iteritems():
-            if terms.intersection(set(comment['body'])):
+            if terms.intersection(set(comment['body']/)):
                 lines.extend(build_lines_comment(post_id, comment_id, post))
 
     return lines 
@@ -140,22 +142,29 @@ def get_sentiments(parse_tree):
     extract the sentiments for each group of sentences constituting a "body"
     return a dict mapping ids to the sentiment values for each sentence in the body
     """
-    parsed_sentences = parse_tree[0]['sentences']
+    
 
     sentiments = {}
     current_doc = None
+    
+    for parsed_sentences in parse_tree:
+        for s in parsed_sentences['sentences']:
+            sys.stdout.write('.')
+            sys.stdout.flush()
 
-    for s in parsed_sentences:
-        sys.stdout.write('.')
-        sys.stdout.flush()
+            if s['text'][0] == 'UNIQQQID':
 
-        if s['text'][0] == 'UNIQQQID':
-            current_doc = s['text'][1]
-            sentiments[current_doc] = []
-            continue
+                if len(s['text'])   == 3:
+                    current_doc = s['text'][1]
 
-        sentiments[current_doc].append(float(s['sentimentValue']))
-        
+                elif len(s['text']) == 5:
+                    current_doc = s['text'][1] + s['text'][2] + s['text'][3]
+
+                sentiments[current_doc] = []
+                continue
+
+            sentiments[current_doc].append(float(s['sentimentValue']))
+            
     return sentiments
 
 def compute_main_sentiments(sentiments_dict):
@@ -175,10 +184,16 @@ if __name__ == "__main__":
 
     if args.preprocessed is not None:
         processed = load_from_json(args.preprocessed)
+        terms = set(processed['nootropics']['top_100_tfidf_terms'].keys()[:20])
+        dump_mentions_to_raw_text(terms, processed, 'data/raw/bodytext')
+        parse_raw_text('data/raw/bodytext')
 
-    terms = set(processed['nootropics']['top_100_tfidf_terms'].keys()[:20])
-    dump_mentions_to_raw_text(terms, processed, 'data/raw/bodytext')
-    parse_raw_text('data/raw/bodytext')
+    elif args.parse_tree is not None:
+        parse_tree = load_from_json(args.parse_tree)
+        sentiments = get_sentiments(parse_tree)
+        json.dump(sentiments, "data/processed/sentiments_dict.json")
+
+
 
 
 

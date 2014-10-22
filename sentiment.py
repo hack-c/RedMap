@@ -11,7 +11,7 @@ raw_text_dir = 'data/raw/bodytext'
 parser = argparse.ArgumentParser()
 parser.add_argument("-p", "--preprocessed", help="path to preprocessed json file",
                     action="store")
-parser.add_argument("-t", "--parse-tree", help="path to preprocessed parse tree",
+parser.add_argument("-t", "--tree", help="path to preprocessed parse tree",
                     action="store")
 args = parser.parse_args()
 
@@ -68,7 +68,7 @@ def find_mentions(terms, processed_dict):
            lines.extend(build_lines_body(post_id, post))
 
         for comment_id, comment in post['tokenized']['comments'].iteritems():
-            if terms.intersection(set(comment['body']/)):
+            if terms.intersection(set(comment['body'])):
                 lines.extend(build_lines_comment(post_id, comment_id, post))
 
     return lines 
@@ -188,8 +188,8 @@ if __name__ == "__main__":
         dump_mentions_to_raw_text(terms, processed, 'data/raw/bodytext')
         parse_raw_text('data/raw/bodytext')
 
-    elif args.parse_tree is not None:
-        parse_tree = load_from_json(args.parse_tree)
+    elif args.tree is not None:
+        parse_tree = load_from_json(args.tree)
         sentiments = get_sentiments(parse_tree)
         json.dump(sentiments, "data/processed/sentiments_dict.json")
 

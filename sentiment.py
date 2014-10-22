@@ -3,7 +3,7 @@ import argparse
 import json
 
 from corenlp import batch_parse
-from preprocess import load_from_json
+
 
 corenlpdir = '../corenlp-python/stanford-corenlp-full-2014-08-27/'
 raw_text_dir = 'data/raw/bodytext'
@@ -14,6 +14,19 @@ parser.add_argument("-p", "--preprocessed", help="path to preprocessed json file
 parser.add_argument("-t", "--tree", help="path to preprocessed parse tree",
                     action="store")
 args = parser.parse_args()
+
+
+def load_from_json(fpath):
+    """
+    loads crawled posts from .json file
+    returns dict 
+    """
+    print "\n\n====================[ loading data from %s ... ]====================\n" % (fpath)
+    
+    with open(fpath, "rb") as f:
+        return_dict = json.load(f)
+        print "====================[ done.                                        ]=====================\n\n"
+        return return_dict
 
 
 def remove_nonascii(s):
@@ -146,6 +159,8 @@ def get_sentiments(parse_tree):
 
     sentiments = {}
     current_doc = None
+
+    print "extracting sentiments from parse tree...\n\n"
     
     for parsed_sentences in parse_tree:
         for s in parsed_sentences['sentences']:
@@ -165,6 +180,7 @@ def get_sentiments(parse_tree):
 
             sentiments[current_doc].append(float(s['sentimentValue']))
             
+    print "\n\ndone.\n\n"
     return sentiments
 
 def compute_main_sentiments(sentiments_dict):
@@ -191,7 +207,7 @@ if __name__ == "__main__":
     elif args.tree is not None:
         parse_tree = load_from_json(args.tree)
         sentiments = get_sentiments(parse_tree)
-        json.dump(sentiments, "data/processed/sentiments_dict.json")
+        json.dump(sentiments, open("data/processed/sentiments_dict.json", 'wb'))
 
 
 

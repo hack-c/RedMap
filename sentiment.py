@@ -41,8 +41,8 @@ def build_lines_whole_post(post_id, post):
     return list of strings in proper format
     """
 
-    body_line     = build_line_body(post_id, post)
-    comment_lines = [build_line_comment(post_id, comment_id, post) for comment_id in post['comments'].keys()]
+    body_line     = build_lines_body(post_id, post)
+    comment_lines = [build_lines_comment(post_id, comment_id, post) for comment_id in post['comments'].keys()]
 
     return body_line + comment_lines
 
@@ -66,7 +66,7 @@ def find_mentions(terms, processed_dict):
            lines.extend(build_lines_body(post_id, post))
 
         for comment_id, comment in post['tokenized']['comments'].iteritems():
-            if terms.intersection(set(comment)):
+            if terms.intersection(set(comment['body'])):
                 lines.extend(build_lines_comment(post_id, comment_id, post))
 
     return lines 
@@ -126,6 +126,7 @@ def parse_raw_text(raw_text_dir):
     mean_sentiments = compute_mean_sentiments(sentiments)
 
     print "\n\nsaving ...\n\n"
+    json.dump(parse_tree, open("data/processed/parse_tree.json", 'wb'))
     json.dump(mean_sentiments, open("data/processed/sentiments_dict.json", 'wb'))
     print "done."
 

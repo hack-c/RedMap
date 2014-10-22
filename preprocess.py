@@ -16,6 +16,8 @@ parser.add_argument("-s", "--scrape", help="scrape data fresh",
                     action="store_true")
 parser.add_argument("-r", "--subreddit", help="specify subreddits delimited by +",
                     action="store")
+parser.add_argument("-p", "--preprocessed", help="path to preprocessed json file",
+                    action="store")
 args = parser.parse_args()
 
 
@@ -96,7 +98,7 @@ def dump_to_json(posts_dict, fpath="hot_posts.json"):
     """
     dumps crawled posts to a .json file
     """
-    print "====================[ saving data to %s ...    ]=====================\n\n" % (fpath)
+    print "\n\n====================[ saving data to %s ...    ]=====================\n\n" % (fpath)
     
     with open(fpath, "wb") as f:
         json.dump(posts_dict, f)
@@ -149,7 +151,7 @@ def load_and_preprocess_dict(posts_dict, subreddits):
 
     for subred in subreddits:
         
-        print "\n\nnormalizing /r/%s ...\n\n" % (subred)
+        print "\n\n\nnormalizing /r/%s ...\n" % (subred)
         
         for post_id, post in posts_dict[subred].iteritems():
             sys.stdout.write('.')
@@ -228,22 +230,26 @@ def build_gensim_corpus(processed_dict):
     # return [item for sublist in [posts_dict[item] for item in subreddits] for item in sublist]
 
 
-
 if __name__ == "__main__":
     if args.subreddit is not None:
         subreddits = args.subreddit.split('+')
     if args.scrape:
         raw_posts = scrape_and_extract (subreddits=subreddits)
         dump_to_json (raw_posts, fpath='data/raw/hot_id_10-21-2014.json')
+    if args.preprocessed is not None:
+        processed = load_from_json(fpath=args.preprocessed)
     else:
         raw_posts = load_from_json (fpath='data/raw/hot_id_10-21-2014.json')
+        subreddits = raw_posts.keys() # this is a hack, should fix this somehow...
+        processed  = load_and_preprocess_dict (raw_posts, subreddits=subreddits)
+        dump_to_json (processed, fpath='data/processed/hot_tokenized_10-21-2014.json')
     
-    subreddits = raw_posts.keys() # this is a hack, should fix this somehow...
-    processed  = load_and_preprocess_dict (raw_posts, subreddits=subreddits)
+    print "\n\nflattening..."
     flattened  = flatten_dict_to_tokens (processed)
     doc_map    = dict(list(enumerate(flattened.keys())))
     texts      = flattened.values()
 
+    print "\n\nbuilding corpus..."
     dictionary = gensim.corpora.Dictionary(texts)
     once_ids = [tokenid for tokenid, docfreq in dictionary.dfs.iteritems() if docfreq == 1]
     dictionary.filter_tokens(once_ids)
@@ -252,10 +258,16 @@ if __name__ == "__main__":
     corpus = [dictionary.doc2bow(text) for text in texts]
     gensim.corpora.MmCorpus.serialize('data/processed/flattened_subreddits.mm', corpus)
     corpus = gensim.corpora.MmCorpus('data/processed/flattened_subreddits.mm')
-    tfidf = gensim.models.TfidfModel(corpus)
+
+    print "\n\ntransforming to tf-idf..."
+    tfidf = gensim.models.TfidfModel(corpus, normalize=True)
     corpus_tfidf = tfidf[corpus]
+
+    print "\n\ntraining lsi..."
     lsi = gensim.models.LsiModel(corpus_tfidf, id2word=dictionary, num_topics=300)
     corpus_lsi = lsi[corpus_tfidf]
+
+    print "\n\ncomputing /r/nootropics <--> /r/* similarities..."
     vec_bow = dictionary.doc2bow(flattened['nootropics'])
     vec_lsi = lsi[vec_bow]
     index = gensim.similarities.MatrixSimilarity(lsi[corpus])    
@@ -264,13 +276,17 @@ if __name__ == "__main__":
     sims = sorted(enumerate(sims), key=lambda item: -item[1])
 
     for (i, sim) in sims:
-        processed[doc_map[i]]['similarity_to_nootropics'] = sim
+        processed[doc_map[i]]['similarity_to_nootropics'] = str(sim)
+
+    
+    print "\n\nsaving most relevant tf-idf terms..."
+    id2token = dict((v,k) for k,v in dictionary.token2id.iteritems())
 
     for i, doc in enumerate(corpus_tfidf):
         top_100_terms = sorted(doc, key=lambda item: item[1], reverse=True)[:100]
-        processed[doc_map[i]]['top_100_tfidf_terms'] = [(dictionary.id2token[i], simil) for (i, simil) in top_100_terms]
+        processed[doc_map[i]]['top_100_tfidf_terms'] = {id2token[x[0]]: str(x[1]) for x in top_100_terms}
 
-    dump_to_json(processed, fpath='data/processed/tfidfs_and_sims.json')
+    dump_to_json(processed, fpath='data/processed/tfidfs_and_sims_10-21-2014.json')
 
 
 

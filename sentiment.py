@@ -89,7 +89,7 @@ def dump_mentions_to_raw_text(terms, processed_dict, outdir):
     total_lines_written  = 0
 
 
-    print "\n\nwriting to file %i... \n" % (files_written)
+    print "\n\nwriting file %i...\n" % (files_written)
 
     for line in find_mentions(terms, processed_dict):
         sys.stdout.write('.')
@@ -107,7 +107,7 @@ def dump_mentions_to_raw_text(terms, processed_dict, outdir):
         lines_written       += 1
         total_lines_written += 1
 
-    print "\n\nwrote %i lines." % (total_lines_written)
+    print "\n\nwrote %i lines.\n\n" % (total_lines_written)
 
     outfile.close()
 

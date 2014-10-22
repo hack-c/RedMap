@@ -196,6 +196,29 @@ def compute_mean_sentiments(sentiments_dict):
     return {k: sum(v)/len(v) for k,v in sentiments_dict.iteritems()}
 
 
+def annotate(sentiments, processed_dict):
+    """
+    take in a mapping of unique ids to sentiments and a json data object containing post data
+    annotate each post in sentiments with its sentiment
+    return the json data object
+    """
+    print "annotating posts with sentiments..."
+
+    for pid, sentiment in sentiments.iteritems():
+        sys.stdout.write('.')
+        sys.stdout.flush()
+
+        address = pid.split(":")
+
+        if len(address)   == 1:
+            processed_dict['nootropics']['posts'][pid]['sentiment'] = sentiment
+        elif len(address) == 2:
+            processed_dict['nootropics']['posts'][address[0]]['comments'][address[1]]['sentiment'] = sentiment
+
+    return processed_dict
+
+
+
 if __name__ == "__main__":
 
     if args.preprocessed is not None:
@@ -207,7 +230,13 @@ if __name__ == "__main__":
     elif args.tree is not None:
         parse_tree = load_from_json(args.tree)
         sentiments = get_sentiments(parse_tree)
+        sentiments = compute_mean_sentiments(sentiments)
         json.dump(sentiments, open("data/processed/sentiments_dict.json", 'wb'))
+        processed = annotate(sentiments, load_from_json("data/processed/tfidfs_and_sims_10-21-2014.json"))
+        print "\n\nsaving annotated json object...\n\n"
+        json.dump(processed, open("data/processed/tfidfs_and_sims_10-22-2014.json", 'wb'))
+        print "done.\n\n"
+
 
 
 

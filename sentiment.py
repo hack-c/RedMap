@@ -218,6 +218,46 @@ def annotate(sentiments, processed_dict):
     return processed_dict
 
 
+def annotate_tfidf_terms(processed_dict):
+    """
+    take processed dict, 
+    make a pass over each post and comments,
+    take set intersection between terms and the post tokens,
+    for term in intersection append sentiment to term dict
+    """
+
+    print "\n\nannotating tfidf terms with mean sentiment...\n\n"
+
+    terms = set(processed_dict['nootropics']['top_100_tfidf_terms'].keys())
+
+    for post in processed_dict['nootropics']['posts'].itervalues():
+        post_body_intersection = terms.intersection(set(post['tokenized']['body'] + post['tokenized']['title']))
+        if post_body_intersection and post.has_key('sentiment'):
+            for term in post_body_intersection:
+                processed_dict['nootropics']['top_100_tfidf_terms'][term]['sentiment'].append((post['sentiment'], post['score'] or 1))
+        for comment in post['tokenized']['comments'].itervalues():
+            comment_intersection = terms.intersection(set(comment['body']))
+            if comment_intersection and comment.has_key('sentiment'):
+                for term in comment_intersection:
+                    processed_dict['nootropics']['top_100_tfidf_terms'][term]['sentiment'].append((comment['sentiment'], comment['score'] or 1))
+
+    return processed_dict
+
+
+def compute_termwise_weighted_sentiment(processed_dict):
+    """
+    compute the average sentiment for each term, weighted by the score of each mention
+    """
+    print "computing termwise weighted sentiment...\n\n"
+
+    for term_dict in processed_dict['nootropics']['top_100_tfidf_terms'].itervalues():
+        term_dict['weighted_average_sentiment'] = sum(x[0]*x[1] for x in term_dict['sentiment']) / float(sum([x[1] for x in term_dict['sentiment']]))
+
+    print "done.\n\n"
+
+    return processed_dict
+
+
 
 if __name__ == "__main__":
 
@@ -232,18 +272,12 @@ if __name__ == "__main__":
         sentiments = get_sentiments(parse_tree)
         sentiments = compute_mean_sentiments(sentiments)
         json.dump(sentiments, open("data/processed/sentiments_dict.json", 'wb'))
-        processed = annotate(sentiments, load_from_json("data/processed/tfidfs_and_sims_10-21-2014.json"))
+        processed = annotate_tfidf_terms(annotate(sentiments, load_from_json("data/processed/full_10-22-2014.json")))
+        processed = compute_termwise_weighted_sentiment(processed)
         print "\n\nsaving annotated json object...\n\n"
-        json.dump(processed, open("data/processed/tfidfs_and_sims_10-22-2014.json", 'wb'))
+        json.dump(processed, open("data/processed/full_10-23-2014.json", 'wb'))
         print "done.\n\n"
 
-
-
-
-
-
-    # dump_json_to_raw_text('data/raw/hot_posts_raw_with_id.json', 'data/raw/bodytext')
-    # parse_raw_text('data/raw/bodytext')
 
 
 

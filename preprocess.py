@@ -220,6 +220,20 @@ def build_gensim_corpus(processed_dict):
     texts = []
 
 
+def get_total_points(term, processed_dict):
+    """
+    sum the scores for posts and comments which mention term
+    """
+    scores = []
+
+    for post in processed_dict['nootropics']['posts'].itervalues():
+        if term in set(post['tokenized']['body'] + post['tokenized']['title']):
+            scores.append(post['score'] or 1)
+        for comment in post['tokenized']['comments'].itervalues():
+            if term in set(comment['body']):
+                scores.append(comment['score'] or 1)
+
+    return sum(scores)
 
 
 # def flatten_posts_to_list(posts_dict):
@@ -244,7 +258,7 @@ if __name__ == "__main__":
         processed  = load_and_preprocess_dict (raw_posts, subreddits=subreddits)
         dump_to_json (processed, fpath='data/processed/hot_tokenized_10-21-2014.json')
     
-    print "\n\nflattening..."
+    print "flattening..."
     flattened  = flatten_dict_to_tokens (processed)
     doc_map    = dict(list(enumerate(flattened.keys())))
     texts      = flattened.values()
@@ -284,9 +298,15 @@ if __name__ == "__main__":
 
     for i, doc in enumerate(corpus_tfidf):
         top_100_terms = sorted(doc, key=lambda item: item[1], reverse=True)[:100]
-        processed[doc_map[i]]['top_100_tfidf_terms'] = {id2token[x[0]]: str(x[1]) for x in top_100_terms}
+        processed[doc_map[i]]['top_100_tfidf_terms'] = {
+            id2token[x[0]]: {
+                'tfidf':str(x[1]), 
+                'total_points': get_total_points(x, processed),
+                'sentiment':[]
+            } for x in top_100_terms
+        }
 
-    dump_to_json(processed, fpath='data/processed/tfidfs_and_sims_10-21-2014.json')
+    dump_to_json(processed, fpath='data/processed/full_10-22-2014.json')
 
 
 

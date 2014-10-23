@@ -69,19 +69,23 @@ class RedditCollection(RedditClient):
         """
         pickle the posts dataframe 
         """
-        assert isinstance(self.posts, pd.DataFrame)
+        assert isinstance(self.df, pd.DataFrame)
 
         fpath = 'data/raw/%s_%i.pkl' % ('_'.join(self.subreddits), int(time.time()))
         print "\n\nsaving to %s..."  % (fpath)
 
-        self.posts.to_pickle(fpath)
+        self.df.to_pickle(fpath)
 
 
     def preprocess(self):
         """
         tokenize text_columns and sum, dump to new tokens column 
         """
-        assert isinstance(self.posts, pd.DataFrame)
+        assert isinstance(self.df, pd.DataFrame)
+
+        for col in settings.text_columns:
+            self.df[col + '_tokens'] = self.df[col].apply(tokenize)
+            self.df['tokens']       += self.df[col + '_tokens']
 
         # TODO:
         # - sum text columns

@@ -1,6 +1,8 @@
 import sys
+import os 
 import time
 import praw
+import gensim
 import pandas as pd
 
 from settings import config
@@ -30,7 +32,7 @@ class RedditCollection(RedditClient):
     def __init__(self):
         super(RedditCollection, self).__init__()
         self.subreddits = None
-        self.posts      = None
+        self.df         = None
 
 
     def scrape(self, subreddits=None):
@@ -78,18 +80,51 @@ class RedditCollection(RedditClient):
         self.df.to_pickle(fpath)
 
 
+    def read_pickle(fpath):
+        """
+        read from pickle
+        """
+        assert os.path.exists(fpath)
+
+        self.df = pd.io.pickle.read_pickle(fpath)
+
+
     def preprocess(self):
         """
         tokenize text_columns and sum, dump to new tokens column 
         """
         assert isinstance(self.df, pd.DataFrame)
 
-        for col in settings.text_columns:
+        self.df['body'].fillna(self.df['selftext'], inplace=True)
+        self.df['title'].apply(lambda x: u'' if x is None else x)
+        del self.df['selftext']
+
+        for col in ('body', 'title'):
             self.df[col + '_tokens'] = self.df[col].apply(tokenize)
-            self.df['tokens']       += self.df[col + '_tokens']
+
+        self.df['tokens'] = [t + b for t,b in zip(df.body_tokens, df.title_tokens)]
 
         # TODO:
         # - sum text columns
+
+    def get_subreddit_docs(self):
+        """
+        return a dict mapping subreddit names to long lists of tokens
+        """
+        docs_dict = {subred: subr['tokens'].sum() for subr in [self.df[self.df.subreddit == subred] for subred in self.subreddits]}
+        doc_map   = dict(list(enumerate(flattened.keys())))
+
+        return docs_dict, doc_map
+
+    def build_corpus(self):
+        """
+        serialize and return gensim corpus of subreddit-documents
+        """
+        docs_dict, doc_map = self.get_subreddit_docs()
+        docs               = docs_dict.values()
+
+
+
 
 
 

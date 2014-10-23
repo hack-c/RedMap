@@ -1,11 +1,21 @@
 import nltk
 
+config = {
+    'user_agent': "comment grabber for viz by /u/charliehack",
+    'limit': 20,
+    'subreddits': ['nootropics'],
+    'columns': ['name','title','selftext','body','score','short_link','parent_id'],
+}
+
+text_columns = ['title','selftext','body']
+
 useless_words = {
     '1', 
     '2', 
     '3', 
     '4', 
-    '5', 
+    '5',
+    '10', 
     'actually', 
     'also', 
     'always', 
@@ -26,7 +36,6 @@ useless_words = {
     'doesnt', 
     'dont', 
     'downvoting', 
-    '10', 
     'eating', 
     'enough', 
     'even', 

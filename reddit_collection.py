@@ -1,3 +1,4 @@
+import sys
 import time
 import praw
 import pandas as pd
@@ -52,11 +53,11 @@ class RedditCollection(RedditClient):
                 sys.stdout.write('.')
                 sys.stdout.flush()
 
-                posts.append(Submission(p))
+                posts.append(Submission(p).dict)
                 p.replace_more_comments(limit=20)
-                posts.extend([Submission(c) for c in praw.helpers.flatten_tree(p.comments)])
+                posts.extend([Submission(c).dict for c in praw.helpers.flatten_tree(p.comments)])
 
-            print "\ngot %s posts.\n\n" % (str(len(posts_dict[subred])))
+            print "\ngot %i posts.\n\n" % (len(posts))
 
         df       = pd.DataFrame(posts)
         df.index = df.name
@@ -100,13 +101,13 @@ class Submission(object):
     def __init__(self, praw_submission):
         self.columns = config['columns']
         self._populate(praw_submission)
-        return self.dict 
+
 
     def _populate(self, praw_submission):
         """
         populate the dict containing post data
         """
-        self.dict              = {col: getattr(praw_submission, col, None) for col in self.columns}
+        self.dict = {col: getattr(praw_submission, col, None) for col in self.columns}
         self.dict['subreddit'] = praw_submission.subreddit.title
 
 

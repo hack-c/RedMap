@@ -1,7 +1,8 @@
+import time
 import argparse
 
-import settings
-from scraper import RedditScraper
+from reddit_collection import RedditCollection
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-s", "--scrape", help="scrape data fresh",
@@ -15,10 +16,16 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
 
+    r = RedditCollection()
+
     if args.subreddit is not None:
         subreddits = args.subreddit.split('+')
     else:
-        subreddits = settings.config['subreddits']
+        subreddits = r.subreddits
 
     if args.scrape:
-        df = RedditScraper().scrape(subreddits)
+        r.scrape(subreddits)
+        r.pickle()
+
+
+

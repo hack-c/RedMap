@@ -57,12 +57,16 @@ class RedditCollection(RedditClient):
             print "\n\nfetching /r/%s ...\n" % (subred)
 
             for p in self.reddit.get_subreddit(subred, fetch=True).get_hot(limit=self.limit):
-                sys.stdout.write('.')
-                sys.stdout.flush()
 
-                posts.append(Submission(p).dict)
-                p.replace_more_comments(limit=20)
-                posts.extend([Submission(c).dict for c in praw.helpers.flatten_tree(p.comments)])
+                try:
+                    sys.stdout.write('.')
+                    sys.stdout.flush()
+
+                    posts.append(Submission(p).dict)
+                    p.replace_more_comments(limit=20)
+                    posts.extend([Submission(c).dict for c in praw.helpers.flatten_tree(p.comments)])
+                except Exception:
+                    time.sleep(1)
 
             print "\ngot %i posts.\n\n" % (len(posts))
 
@@ -77,7 +81,7 @@ class RedditCollection(RedditClient):
         """
         return a string with the current subreddits and time
         """
-        '%s_%i' % ('+'.join(self.subreddits), int(time.time()))
+        return '%s_%i' % ('+'.join(self.subreddits), int(time.time()))
 
 
     def pickle(self):

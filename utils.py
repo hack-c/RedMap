@@ -14,3 +14,9 @@ def tokenize(raw_string):
         lambda x: x not in settings.useless_words, 
         nltk.word_tokenize(raw_string.lower().translate(table))
     )
+
+def remove_nonascii(s):
+    """
+    strip out nonascii chars
+    """
+    return "".join(i for i in s if ord(i)<128)

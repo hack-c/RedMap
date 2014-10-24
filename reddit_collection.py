@@ -32,6 +32,7 @@ class RedditCollection(RedditClient):
     def __init__(self):
         super(RedditCollection, self).__init__()
         self.subreddits = None
+        self.corpus     = None
         self.df         = None
 
 
@@ -68,13 +69,20 @@ class RedditCollection(RedditClient):
         return self.df
 
 
+    def build_fpath(self):
+        """
+        return a string with the current subreddits and time
+        """
+        '%s_%i' % ('_'.join(self.subreddits), int(time.time()))
+
+
     def pickle(self):
         """
         pickle the posts dataframe 
         """
         assert isinstance(self.df, pd.DataFrame)
 
-        fpath = 'data/raw/%s_%i.pkl' % ('_'.join(self.subreddits), int(time.time()))
+        fpath = 'data/raw/' + self.build_fpath() + '.pkl'
         print "\n\nsaving to %s..."  % (fpath)
 
         self.df.to_pickle(fpath)
@@ -104,8 +112,6 @@ class RedditCollection(RedditClient):
 
         self.df['tokens'] = [t + b for t,b in zip(df.body_tokens, df.title_tokens)]
 
-        # TODO:
-        # - sum text columns
 
     def get_subreddit_docs(self):
         """
@@ -116,12 +122,33 @@ class RedditCollection(RedditClient):
 
         return docs_dict, doc_map
 
+
     def build_corpus(self):
         """
         serialize and return gensim corpus of subreddit-documents
         """
+        fpath = self.build_fpath()
+
         docs_dict, doc_map = self.get_subreddit_docs()
         docs               = docs_dict.values()
+
+        dictionary = gensim.corpora.Dictionary(docs)
+        once_ids   = [tokenid for tokenid, docfreq in dictionary.dfs.iteritems() if docfreq == 1]
+        dictionary.filter_tokens(once_ids)
+        dictionary.compactify()
+        dictionary.save('data/processed/' + fpath + '.dict')
+
+        corpus = [dictionary.doc2bow(doc) for doc in docs]
+
+        gensim.corpora.MmCorpus.serialize ('data/processed/' + fpath + '.mm', corpus)
+        corpus = gensim.corpora.MmCorpus  ('data/processed/' + fpath + '.mm')
+
+        self.corpus = corpus
+
+        return corpus
+
+
+
 
 
 

@@ -35,11 +35,9 @@ if __name__ == "__main__":
         exit()
 
     r.preprocess()
-
+    corpus = r.build_corpus()
     
 
-    subreddit_docs, doc_map = r.get_subreddit_docs()
-    docs = subreddit_docs.values()
 
 
 

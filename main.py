@@ -35,8 +35,9 @@ if __name__ == "__main__":
         exit()
 
     r.preprocess()
-    corpus = r.build_corpus()
     
+    corpus = r.transform_tfidf(r.build_corpus())
+
 
 
 

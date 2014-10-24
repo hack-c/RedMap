@@ -134,7 +134,7 @@ class RedditCollection(RedditClient):
 
         dictionary = gensim.corpora.Dictionary(docs)
         once_ids   = [tokenid for tokenid, docfreq in dictionary.dfs.iteritems() if docfreq == 1]
-        dictionary.filter_tokens(once_ids)
+        dictionary.filter_tokens(once_ids)   # remove tokens that only occur once 
         dictionary.compactify()
         dictionary.save('data/processed/' + fpath + '.dict')
 
@@ -148,8 +148,14 @@ class RedditCollection(RedditClient):
         return corpus
 
 
+    def tfidf_transform(self, corpus):
+        """
+        transform gensim corpus to normalized tf-idf
+        """
+        tfidf        = gensim.models.TfidfModel(corpus, normalize=True)
+        corpus_tfidf = tfidf[corpus]
 
-
+        return corpus_tfidf
 
 
 

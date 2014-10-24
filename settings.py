@@ -2,7 +2,7 @@ import nltk
 
 config = {
     'user_agent': "comment grabber for viz by /u/charliehack",
-    'limit': 20,
+    'limit': None,
     'subreddits': ['nootropics'],
     'columns': ['name','title','selftext','body','score','short_link','parent_id'],
 }

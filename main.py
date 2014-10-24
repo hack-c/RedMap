@@ -36,8 +36,9 @@ if __name__ == "__main__":
 
     r.preprocess()
     
-    corpus = r.transform_tfidf(r.build_corpus())
-
+    corpus       = r.lsi_transform(r.tfidf_transform(r.build_corpus()))
+    similarities = r.compute_subreddit_similarities(subreddits[0], corpus) # TODO: store the 'main subreddit'?
+    json.dump(similarities, 'data/processed/similarities_10-24.json')
 
 
 

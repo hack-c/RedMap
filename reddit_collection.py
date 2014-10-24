@@ -32,8 +32,12 @@ class RedditCollection(RedditClient):
     def __init__(self):
         super(RedditCollection, self).__init__()
         self.subreddits = None
-        self.corpus     = None
         self.df         = None
+        self.corpus     = None
+        self.dictionary = None
+        self.tfidf      = None
+        self.lsi        = None
+
 
 
     def scrape(self, subreddits=None):
@@ -73,7 +77,7 @@ class RedditCollection(RedditClient):
         """
         return a string with the current subreddits and time
         """
-        '%s_%i' % ('_'.join(self.subreddits), int(time.time()))
+        '%s_%i' % ('+'.join(self.subreddits), int(time.time()))
 
 
     def pickle(self):
@@ -107,6 +111,8 @@ class RedditCollection(RedditClient):
         self.df['title'].apply(lambda x: u'' if x is None else x)
         del self.df['selftext']
 
+        self.df['subreddit'].apply(lower)
+
         for col in ('body', 'title'):
             self.df[col + '_tokens'] = self.df[col].apply(tokenize)
 
@@ -129,14 +135,15 @@ class RedditCollection(RedditClient):
         """
         fpath = self.build_fpath()
 
-        docs_dict, doc_map = self.get_subreddit_docs()
-        docs               = docs_dict.values()
+        self.docs_dict, self.doc_map = self.get_subreddit_docs()
+        self.docs                    = self.docs_dict.values()
 
         dictionary = gensim.corpora.Dictionary(docs)
         once_ids   = [tokenid for tokenid, docfreq in dictionary.dfs.iteritems() if docfreq == 1]
         dictionary.filter_tokens(once_ids)   # remove tokens that only occur once 
         dictionary.compactify()
         dictionary.save('data/processed/' + fpath + '.dict')
+        self.dictionary = dictionary
 
         corpus = [dictionary.doc2bow(doc) for doc in docs]
 
@@ -153,10 +160,42 @@ class RedditCollection(RedditClient):
         transform gensim corpus to normalized tf-idf
         """
         tfidf        = gensim.models.TfidfModel(corpus, normalize=True)
+        self.tfidf   = tfidf 
         corpus_tfidf = tfidf[corpus]
 
         return corpus_tfidf
 
+
+    def lsi_transform(self, corpus):
+        """
+        fit lsi 
+        """
+        lsi        = gensim.models.LsiModel(corpus, id2word=self.dictionary, num_topics=300)
+        self.lsi   = lsi
+        corpus_lsi = lsi[corpus]
+
+        return corpus_lsi
+
+
+    def compute_subreddit_similarities(self, main_subreddit, corpus_lsi):
+        """
+        compute document similarities between main_subreddit and the rest
+        """
+        vec_bow = self.dictionary.doc2bow(self.docs_dict[main_subreddit])
+        vec_lsi = self.lsi[vec_bow]
+        index   = gensim.similarities.MatrixSimilarity(corpus_lsi)    
+
+        index.save('data/processed/' + self.build_fpath() + '_lsi.index')
+
+        sims = index[vec_lsi]
+        sims = sorted(enumerate(sims), key=lambda item: -item[1])
+
+        similarity_map = {}
+
+        for (i, sim) in sims:
+            similarity_map[main_subreddit + '_to_' + self.doc_map[i]] = str(sim)
+
+        return similarity_map
 
 
 

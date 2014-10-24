@@ -10,6 +10,7 @@ import pandas as pd
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 
+from settings import useless_words
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-s", "--scrape", help="scrape data fresh",
@@ -21,38 +22,7 @@ parser.add_argument("-p", "--preprocessed", help="path to preprocessed json file
 args = parser.parse_args()
 
 
-# subreddits = ['nootropics', 
-#               'nutrition', 
-#               'Health', 
-#               'FixMyDiet', 
-#               'Dietetics', 
-#               'supplements', 
-#               'stackadvice', 
-#               'afinil', 
-#               'drugnerds', 
-#               'foodnerds', 
-#               'caffeine', 
-#               'braintraining', 
-#               'enhance', 
-#               'tdcs', 
-#               'selfimprovement', 
-#               'gainit',
-#               'advancedfitness', 
-#               'steroids',
-#               'longevity', 
-#               'SENS', 
-#               'Futurism', 
-#               'Futurology', 
-#               'Posthumanism', 
-#               'Singularitarianism', 
-#               'Singularity', 
-#               'Transhuman', 
-#               'Transhumanism', 
-#               'Neurophilosophy', 
-#               'SFStories']
 
-useless_words = {'1', '2', '3', '4', '5', 'actually', 'also', 'always', 'another', 'anyone', 'anything', 'around', 'back', 'bad', 'book', 'cant', 'could', 'cut', 'david', 'day', 'days', 'different', 'doesnt', 'dont', 'downvoting', '10', 'eating', 'enough', 'even', 'every', 'far', 'feel', 'find', 'first', 'future', 'get', 'getting', 'go', 'going', 'good', 'got', 'great', 'gt', 'guys', 'gym', 'hard', 'help', 'high', 'human', 'id', 'ill', 'im', 'isnt', 'ive', 'keep', 'know', 'less', 'life', 'like', 'little', 'long', 'look', 'looking', 'lot', 'low', 'made', 'make', 'many', 'may', 'maybe', 'mg', 'might', 'months', 'much', 'need', 'never', 'new', 'one', 'people', 'pretty', 'probably', 'put', 'raises', 'really', 'right', 'say', 'see', 'someone', 'something', 'start', 'started', 'still', 'sub', 'sure', 'take', 'taking', 'test', 'thats', 'thing', 'things', 'think', 'though', 'time', 'try', 'two', 'us', 'use', 'using', 'want', 'way', 'week', 'weeks', 'well', 'without', 'wont', 'work', 'world', 'would', 'years', 'youre'}
-useless_words = set(nltk.corpus.stopwords.words('english') + list(useless_words))
 
 def scrape_and_extract(subreddits):
     """
@@ -244,42 +214,42 @@ def get_total_points(term, processed_dict):
     # return [item for sublist in [posts_dict[item] for item in subreddits] for item in sublist]
 
 
-if __name__ == "__main__":
-    if args.subreddit is not None:
-        subreddits = args.subreddit.split('+')
-    if args.scrape:
-        raw_posts = scrape_and_extract (subreddits=subreddits)
-        dump_to_json (raw_posts, fpath='data/raw/hot_10-22-2014.json')
-    if args.preprocessed is not None:
-        processed = load_from_json(fpath=args.preprocessed)
-    else:
-        raw_posts = load_from_json (fpath='data/raw/hot_10-22-2014.json')
-        subreddits = raw_posts.keys() # this is a hack, should fix this somehow...
-        processed  = load_and_preprocess_dict (raw_posts, subreddits=subreddits)
-        dump_to_json (processed, fpath='data/processed/hot_tokenized_10-21-2014.json')
+# if __name__ == "__main__":
+#     if args.subreddit is not None:
+#         subreddits = args.subreddit.split('+')
+#     if args.scrape:
+#         raw_posts = scrape_and_extract (subreddits=subreddits)
+#         dump_to_json (raw_posts, fpath='data/raw/hot_10-22-2014.json')
+#     if args.preprocessed is not None:
+#         processed = load_from_json(fpath=args.preprocessed)
+#     else:
+#         raw_posts = load_from_json (fpath='data/raw/hot_10-22-2014.json')
+#         subreddits = raw_posts.keys() # this is a hack, should fix this somehow...
+#         processed  = load_and_preprocess_dict (raw_posts, subreddits=subreddits)
+#         dump_to_json (processed, fpath='data/processed/hot_tokenized_10-21-2014.json')
     
-    print "flattening..."
-    flattened  = flatten_dict_to_tokens (processed)
-    doc_map    = dict(list(enumerate(flattened.keys())))
-    texts      = flattened.values()
+#     print "flattening..."
+#     flattened  = flatten_dict_to_tokens (processed)
+#     doc_map    = dict(list(enumerate(flattened.keys())))
+#     texts      = flattened.values()
 
-    print "\n\nbuilding corpus..."
-    dictionary = gensim.corpora.Dictionary(texts)
-    once_ids = [tokenid for tokenid, docfreq in dictionary.dfs.iteritems() if docfreq == 1]
-    dictionary.filter_tokens(once_ids)
-    dictionary.compactify()
-    dictionary.save('data/processed/flattened_subreddits.dict')
-    corpus = [dictionary.doc2bow(text) for text in texts]
-    gensim.corpora.MmCorpus.serialize('data/processed/flattened_subreddits.mm', corpus)
-    corpus = gensim.corpora.MmCorpus('data/processed/flattened_subreddits.mm')
+#     print "\n\nbuilding corpus..."
+#     dictionary = gensim.corpora.Dictionary(texts)
+#     once_ids = [tokenid for tokenid, docfreq in dictionary.dfs.iteritems() if docfreq == 1]
+#     dictionary.filter_tokens(once_ids)
+#     dictionary.compactify()
+#     dictionary.save('data/processed/flattened_subreddits.dict')
+#     corpus = [dictionary.doc2bow(text) for text in texts]
+#     gensim.corpora.MmCorpus.serialize('data/processed/flattened_subreddits.mm', corpus)
+#     corpus = gensim.corpora.MmCorpus('data/processed/flattened_subreddits.mm')
 
-    print "\n\ntransforming to tf-idf..."
-    tfidf = gensim.models.TfidfModel(corpus, normalize=True)
-    corpus_tfidf = tfidf[corpus]
+    # print "\n\ntransforming to tf-idf..."
+    # tfidf = gensim.models.TfidfModel(corpus, normalize=True)
+    # corpus_tfidf = tfidf[corpus]
 
-    print "\n\ntraining lsi..."
-    lsi = gensim.models.LsiModel(corpus_tfidf, id2word=dictionary, num_topics=300)
-    corpus_lsi = lsi[corpus_tfidf]
+    # print "\n\ntraining lsi..."
+    # lsi = gensim.models.LsiModel(corpus_tfidf, id2word=dictionary, num_topics=300)
+    # corpus_lsi = lsi[corpus_tfidf]
 
     print "\n\ncomputing /r/nootropics <--> /r/* similarities..."
     vec_bow = dictionary.doc2bow(flattened['nootropics'])

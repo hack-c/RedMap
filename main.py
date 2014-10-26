@@ -28,17 +28,15 @@ if __name__ == "__main__":
         r.pickle()
 
     elif args.pickle is not None:
-        r.from_pickle(args.pickle)
+        r.read_pickle(args.pickle)
 
     else:
         print("Please specify a path to a pickle or an -s flag.")
         exit()
 
     r.preprocess()
-    
-    corpus       = r.lsi_transform(r.tfidf_transform(r.build_corpus()))
-    similarities = r.compute_subreddit_similarities(subreddits[0], corpus) # TODO: store the 'main subreddit'?
-    json.dump(similarities, 'data/processed/similarities_10-24.json')
+    r.process_similarities()
+    r.process_top_tfidf()
 
 
 

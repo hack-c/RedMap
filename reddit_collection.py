@@ -49,7 +49,7 @@ class RedditCollection(RedditClient):
     """
     def __init__(self):
         super(RedditCollection, self).__init__()
-        self.subreddits  = None
+        self.fpath       = None
         self.df          = None
         self.corpus      = None
         self.dictionary  = None
@@ -67,8 +67,8 @@ class RedditCollection(RedditClient):
         WARNING: this can take a long ass time 
         """
         if subreddits:
-            self.subreddits      = subreddits
-            self.main_subreddit  = subreddits[0]
+            self.subreddits = subreddits
+        self.main_subreddit = self.subreddits[0]
     
         posts = []
 
@@ -118,11 +118,12 @@ class RedditCollection(RedditClient):
         self.df.to_pickle(fpath)
 
 
-    def read_pickle(fpath):
+    def read_pickle(self, fpath):
         """
         read from pickle
         """
         assert os.path.exists(fpath)
+        self.fpath = fpath.split('/')[-1][:-4]  # hack... but whatever
 
         print "\n\nreading pickle from %s..." % (fpath)
 
@@ -135,24 +136,27 @@ class RedditCollection(RedditClient):
         """
         assert isinstance(self.df, pd.DataFrame)
 
+        print "\n\npreprocessing text..."
+
         self.df['body'].fillna(self.df['selftext'], inplace=True)
-        self.df['title'].apply(lambda x: u'' if x is None else x)
+        self.df['body']   = self.df['body'].apply (lambda x:  u'' if x is None else x)
+        self.df['title']  = self.df['title'].apply(lambda x:  u'' if x is None else x)
         del self.df['selftext']
 
-        self.df['subreddit'].apply(lower)
+        self.df['subreddit'] = self.df['subreddit'].apply(unicode.lower)
 
         for col in ('body', 'title'):
             self.df[col + '_tokens'] = self.df[col].apply(tokenize)
 
-        self.df['tokens'] = [t + b for t,b in zip(df.body_tokens, df.title_tokens)]
+        self.df['tokens'] = [t + b for t,b in zip(self.df.body_tokens, self.df.title_tokens)]
 
 
     def get_subreddit_docs(self):
         """
         return a dict mapping subreddit names to long lists of tokens
         """
-        docs_dict = {subred: subr['tokens'].sum() for subr in [self.df[self.df.subreddit == subred] for subred in self.subreddits]}
-        doc_map   = dict(list(enumerate(flattened.keys())))
+        docs_dict  = {subred: subr['tokens'].sum() for subr in [self.df[self.df.subreddit == subred] for subred in self.subreddits]}
+        doc_map    = dict(list(enumerate(docs_dict.keys()))) # later we'll need to know which numbered doc corresponds to which subreddit
 
         return docs_dict, doc_map
 
@@ -161,17 +165,17 @@ class RedditCollection(RedditClient):
         """
         serialize and return gensim corpus of subreddit-documents
         """
-        self.docs_dict, self.doc_map = self.get_subreddit_docs()
-        self.docs                    = self.docs_dict.values()
+        self.docs_dict, self.doc_map  = self.get_subreddit_docs()
+        self.docs                     = self.docs_dict.values()
 
-        dictionary = gensim.corpora.Dictionary(docs)
-        once_ids   = [tokenid for tokenid, docfreq in dictionary.dfs.iteritems() if docfreq == 1]
+        dictionary  = gensim.corpora.Dictionary(self.docs)
+        once_ids    = [tokenid for tokenid, docfreq in dictionary.dfs.iteritems() if docfreq == 1]
         dictionary.filter_tokens(once_ids)   # remove tokens that only occur once 
         dictionary.compactify()
         dictionary.save('data/processed/' + self.fpath + '.dict')
         self.dictionary = dictionary
 
-        corpus = [dictionary.doc2bow(doc) for doc in docs]
+        corpus = [dictionary.doc2bow(doc) for doc in self.docs]
 
         gensim.corpora.MmCorpus.serialize ('data/processed/' + self.fpath + '.mm', corpus)
         corpus = gensim.corpora.MmCorpus  ('data/processed/' + self.fpath + '.mm')
@@ -228,17 +232,19 @@ class RedditCollection(RedditClient):
         process document similarity vectors with LSI on tfidf transformed corpus,
         dump to 
         """
-        corpus        = self.lsi_transform ( self.tfidf_transform( self.build_corpus() ) )
-        similarities  = self.compute_subreddit_similarities ( self.main_subreddit, corpus) 
+        print "\n\nprocessing document similarities..."
+
+        corpus        = self.lsi_transform(self.tfidf_transform(self.build_corpus()))
+        similarities  = self.compute_subreddit_similarities(self.main_subreddit, corpus) 
         
         json.dump(similarities, 'data/processed/' + self.fpath + '_similarities.json')
 
 
-    def get_total_score(term):
+    def get_total_score(self, term):
         """
         sum the scores for posts and comments which mention term
         """
-        return self.df['tokens'].map(lambda x: term in x)['score'].sum()
+        return self.df[self.df['tokens'].map(lambda x: term in x)]['score'].sum()
 
 
     def process_top_tfidf(self, n):

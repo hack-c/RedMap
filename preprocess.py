@@ -251,16 +251,16 @@ def get_total_points(term, processed_dict):
     # lsi = gensim.models.LsiModel(corpus_tfidf, id2word=dictionary, num_topics=300)
     # corpus_lsi = lsi[corpus_tfidf]
 
-    print "\n\ncomputing /r/nootropics <--> /r/* similarities..."
-    vec_bow = dictionary.doc2bow(flattened['nootropics'])
-    vec_lsi = lsi[vec_bow]
-    index = gensim.similarities.MatrixSimilarity(lsi[corpus])    
-    index.save('data/processed/flattened_subreddits_lsi.index')
-    sims = index[vec_lsi]
-    sims = sorted(enumerate(sims), key=lambda item: -item[1])
+    # print "\n\ncomputing /r/nootropics <--> /r/* similarities..."
+    # vec_bow = dictionary.doc2bow(flattened['nootropics'])
+    # vec_lsi = lsi[vec_bow]
+    # index = gensim.similarities.MatrixSimilarity(lsi[corpus])    
+    # index.save('data/processed/flattened_subreddits_lsi.index')
+    # sims = index[vec_lsi]
+    # sims = sorted(enumerate(sims), key=lambda item: -item[1])
 
-    for (i, sim) in sims:
-        processed[doc_map[i]]['similarity_to_nootropics'] = str(sim)
+    # for (i, sim) in sims:
+    #     processed[doc_map[i]]['similarity_to_nootropics'] = str(sim)
 
     
     print "\n\nsaving most relevant tf-idf terms..."

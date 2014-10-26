@@ -31,12 +31,12 @@ class RedditCollection(RedditClient):
     """
     def __init__(self):
         super(RedditCollection, self).__init__()
-        self.subreddits = None
-        self.df         = None
-        self.corpus     = None
-        self.dictionary = None
-        self.tfidf      = None
-        self.lsi        = None
+        self.subreddits  = None
+        self.df          = None
+        self.corpus      = None
+        self.dictionary  = None
+        self.tfidf       = None
+        self.lsi         = None
 
 
 
@@ -49,7 +49,8 @@ class RedditCollection(RedditClient):
         WARNING: this can take a long ass time 
         """
         if subreddits:
-            self.subreddits = subreddits
+            self.subreddits     = subreddits
+            self.main_subreddit = subreddits[0]
     
         posts = []
 
@@ -66,7 +67,7 @@ class RedditCollection(RedditClient):
                     p.replace_more_comments(limit=20)
                     posts.extend([Submission(c).dict for c in praw.helpers.flatten_tree(p.comments)])
                 except Exception:
-                    time.sleep(1)
+                    time.sleep(10)
 
             print "\ngot %i posts.\n\n" % (len(posts))
 
@@ -90,7 +91,9 @@ class RedditCollection(RedditClient):
         """
         assert isinstance(self.df, pd.DataFrame)
 
-        fpath = 'data/raw/' + self.build_fpath() + '.pkl'
+        self.fpath = self.build_fpath()
+
+        fpath = 'data/raw/' + self.fpath + '.pkl'
         print "\n\nsaving to %s..."  % (fpath)
 
         self.df.to_pickle(fpath)
@@ -137,8 +140,6 @@ class RedditCollection(RedditClient):
         """
         serialize and return gensim corpus of subreddit-documents
         """
-        fpath = self.build_fpath()
-
         self.docs_dict, self.doc_map = self.get_subreddit_docs()
         self.docs                    = self.docs_dict.values()
 
@@ -146,13 +147,13 @@ class RedditCollection(RedditClient):
         once_ids   = [tokenid for tokenid, docfreq in dictionary.dfs.iteritems() if docfreq == 1]
         dictionary.filter_tokens(once_ids)   # remove tokens that only occur once 
         dictionary.compactify()
-        dictionary.save('data/processed/' + fpath + '.dict')
+        dictionary.save('data/processed/' + self.fpath + '.dict')
         self.dictionary = dictionary
 
         corpus = [dictionary.doc2bow(doc) for doc in docs]
 
-        gensim.corpora.MmCorpus.serialize ('data/processed/' + fpath + '.mm', corpus)
-        corpus = gensim.corpora.MmCorpus  ('data/processed/' + fpath + '.mm')
+        gensim.corpora.MmCorpus.serialize ('data/processed/' + self.fpath + '.mm', corpus)
+        corpus = gensim.corpora.MmCorpus  ('data/processed/' + self.fpath + '.mm')
 
         self.corpus = corpus
 
@@ -163,22 +164,22 @@ class RedditCollection(RedditClient):
         """
         transform gensim corpus to normalized tf-idf
         """
-        tfidf        = gensim.models.TfidfModel(corpus, normalize=True)
-        self.tfidf   = tfidf 
-        corpus_tfidf = tfidf[corpus]
+        tfidf              = gensim.models.TfidfModel(corpus, normalize=True)
+        self.tfidf         = tfidf 
+        self.corpus_tfidf  = tfidf[corpus]
 
-        return corpus_tfidf
+        return self.corpus_tfidf
 
 
     def lsi_transform(self, corpus):
         """
         fit lsi 
         """
-        lsi        = gensim.models.LsiModel(corpus, id2word=self.dictionary, num_topics=300)
-        self.lsi   = lsi
-        corpus_lsi = lsi[corpus]
+        lsi              = gensim.models.LsiModel(corpus, id2word=self.dictionary, num_topics=300)
+        self.lsi         = lsi
+        self.corpus_lsi  = lsi[corpus]
 
-        return corpus_lsi
+        return self.corpus_lsi
 
 
     def compute_subreddit_similarities(self, main_subreddit, corpus_lsi):
@@ -189,7 +190,7 @@ class RedditCollection(RedditClient):
         vec_lsi = self.lsi[vec_bow]
         index   = gensim.similarities.MatrixSimilarity(corpus_lsi)    
 
-        index.save('data/processed/' + self.build_fpath() + '_lsi.index')
+        index.save('data/processed/' + self.fpath + '_lsi.index')
 
         sims = index[vec_lsi]
         sims = sorted(enumerate(sims), key=lambda item: -item[1])
@@ -201,7 +202,45 @@ class RedditCollection(RedditClient):
 
         return similarity_map
 
+    def process_similarities(self):
+        """
+        process document similarity vectors with LSI on tfidf transformed corpus,
+        dump to 
+        """
+        corpus        = self.lsi_transform ( self.tfidf_transform( self.build_corpus() ) )
+        similarities  = self.compute_subreddit_similarities ( self.main_subreddit, corpus) 
+        
+        json.dump(similarities, 'data/processed/' + self.fpath + '_similarities.json')
 
+
+    def get_total_score(term):
+        """
+        sum the scores for posts and comments which mention term
+        """
+        return self.df['tokens'].map(lambda x: term in x)['score'].sum()
+
+
+    def process_top_tfidf(self, n):
+        """
+        extract the top n highest-ranked terms from the tfidf model and their measures
+        """
+        print "\n\nsaving most relevant tf-idf terms..."
+        
+        self.top_tfidf = {}
+
+        id2token = dict((v,k) for k,v in self.dictionary.token2id.iteritems())
+
+        for i, doc in enumerate(self.corpus_tfidf):
+            top_n_terms = sorted(doc, key=lambda item: item[1], reverse=True)[:n]
+            self.top_tfidf[self.doc_map[i]] = {
+                id2token[x[0]]: {
+                    'tfidf': str(x[1]), 
+                    'total_points': self.get_total_score(x),
+                    'sentiment': []
+                } for x in top_n_terms
+            }
+
+        json.dump(self.top_tfidf, 'data/processed/' + self.fpath + '_top_100_tfidf.json')
 
 
 class Submission(object):

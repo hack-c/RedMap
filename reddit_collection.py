@@ -7,6 +7,8 @@ import pandas as pd
 
 from settings import config
 from settings import text_columns
+from utils import remove_nonascii
+from utils import build_line
 from utils import tokenize
 
 
@@ -139,11 +141,12 @@ class RedditCollection(RedditClient):
         print "\n\npreprocessing text..."
 
         self.df['body'].fillna(self.df['selftext'], inplace=True)
-        self.df['body']   = self.df['body'].apply (lambda x:  u'' if x is None else x)
-        self.df['title']  = self.df['title'].apply(lambda x:  u'' if x is None else x)
+        self.df['body']       = self.df['body'].apply (lambda x:  u'' if x is None else x)
+        self.df['title']      = self.df['title'].apply(lambda x:  u'' if x is None else x)y
+        self.df['body']       = self.df['body'].apply(remove_nonascii)
+        self.df['title']      = self.df['body'].apply(remove_nonascii)
+        self.df['subreddit']  = self.df['subreddit'].apply(unicode.lower)
         del self.df['selftext']
-
-        self.df['subreddit'] = self.df['subreddit'].apply(unicode.lower)
 
         for col in ('body', 'title'):
             self.df[col + '_tokens'] = self.df[col].apply(tokenize)
@@ -268,6 +271,44 @@ class RedditCollection(RedditClient):
             }
 
         json.dump(self.top_tfidf, 'data/processed/' + self.fpath + '_top_100_tfidf.json')
+
+
+    def build_line(s):
+        """
+        take in a series containing a single submission
+        format string to write for post body
+        """
+        return "UNIQQQID " + s['name'] +  + remove_nonascii(s['body']) + "\n\n" if len(s['body']) > 10 else []
+
+
+    def dump_occurences(self, subreddit):
+        """
+        find mentions of top ranked tfidf terms
+        format and dump batchwise to text
+        """
+        terms       = set(self.top_tfidf[subreddit].values())
+        occurences  = self.df[self.df['tokens'].apply(lambda t: set(t) & terms is not None)]
+        lines       = occurences.apply(build_line, axis=1)
+
+        dump_lines_to_text(lines)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

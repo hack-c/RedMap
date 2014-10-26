@@ -16,115 +16,115 @@ parser.add_argument("-t", "--tree", help="path to preprocessed parse tree",
 args = parser.parse_args()
 
 
-def load_from_json(fpath):
-    """
-    loads crawled posts from .json file
-    returns dict 
-    """
-    print "\n\n====================[ loading data from %s ... ]====================\n" % (fpath)
+# def load_from_json(fpath):
+#     """
+#     loads crawled posts from .json file
+#     returns dict 
+#     """
+#     print "\n\n====================[ loading data from %s ... ]====================\n" % (fpath)
     
-    with open(fpath, "rb") as f:
-        return_dict = json.load(f)
-        print "====================[ done.                                        ]=====================\n\n"
-        return return_dict
+#     with open(fpath, "rb") as f:
+#         return_dict = json.load(f)
+#         print "====================[ done.                                        ]=====================\n\n"
+#         return return_dict
 
 
-def remove_nonascii(s):
-    """
-    strip out nonascii chars
-    """
-    return "".join(i for i in s if ord(i)<128)
+# def remove_nonascii(s):
+#     """
+#     strip out nonascii chars
+#     """
+#     return "".join(i for i in s if ord(i)<128)
 
 
-def build_lines_body(post_id, post):
-    """
-    format string to write for post body
-    """
-    return ["UNIQQQID " + post_id + ". " + remove_nonascii(post['body']) + "\n\n"] if len(post['body']) > 10 else []
+# def build_lines_body(post_id, post):
+#     """
+#     format string to write for post body
+#     """
+#     return ["UNIQQQID " + post_id + ". " + remove_nonascii(post['body']) + "\n\n"] if len(post['body']) > 10 else []
 
 
-def build_lines_comment(post_id, comment_id, post):
-    """
-    format string for a single comment
-    """
-    return ["UNIQQQID " + post_id + ":" + comment_id + ". " + remove_nonascii(post['comments'][comment_id]['body']) + "\n\n"]
+# def build_lines_comment(post_id, comment_id, post):
+#     """
+#     format string for a single comment
+#     """
+#     return ["UNIQQQID " + post_id + ":" + comment_id + ". " + remove_nonascii(post['comments'][comment_id]['body']) + "\n\n"]
 
 
-def build_lines_whole_post(post_id, post):
-    """
-    take in unique post id
-    return list of strings in proper format
-    """
+# def build_lines_whole_post(post_id, post):
+#     """
+#     take in unique post id
+#     return list of strings in proper format
+#     """
 
-    body_line     = build_lines_body(post_id, post)
-    comment_lines = [build_lines_comment(post_id, comment_id, post) for comment_id in post['comments'].keys()]
+#     body_line     = build_lines_body(post_id, post)
+#     comment_lines = [build_lines_comment(post_id, comment_id, post) for comment_id in post['comments'].keys()]
 
-    return body_line + comment_lines
-
-
-def find_mentions(terms, processed_dict):
-    """
-    iterates over processed data object,
-    if one of terms occurs in post or comment body,
-    build line and append to list
-    return list of lines to be written to text file
-    """
-    lines = []
-
-    print "\n\nfinding mentions..."
-
-    for post_id, post in processed_dict['nootropics']['posts'].iteritems():
-        sys.stdout.write('.')
-        sys.stdout.flush()
-
-        if terms.intersection(set(post['tokenized']['title'] + post['tokenized']['body'])):
-           lines.extend(build_lines_body(post_id, post))
-
-        for comment_id, comment in post['tokenized']['comments'].iteritems():
-            if terms.intersection(set(comment['body'])):
-                lines.extend(build_lines_comment(post_id, comment_id, post))
-
-    return lines 
+#     return body_line + comment_lines
 
 
+# def find_mentions(terms, processed_dict):
+#     """
+#     iterates over processed data object,
+#     if one of terms occurs in post or comment body,
+#     build line and append to list
+#     return list of lines to be written to text file
+#     """
+#     lines = []
 
-def dump_mentions_to_raw_text(terms, processed_dict, outdir):
-    """
-    load json from inpath
-    for each post body, write line:
-        UNIQQQID asdf3. <body>
-    for each comment body, write line:
-        UNIQQQID asdf3:sdfg4. <body>
-    do batches of 100 bodies per file.
-    """
+#     print "\n\nfinding mentions..."
 
-    outfile              = open(outdir + '/raw_bodies_1.txt', 'wb')
-    lines_written        = 0
-    files_written        = 1
-    total_lines_written  = 0
+#     for post_id, post in processed_dict['nootropics']['posts'].iteritems():
+#         sys.stdout.write('.')
+#         sys.stdout.flush()
+
+#         if terms.intersection(set(post['tokenized']['title'] + post['tokenized']['body'])):
+#            lines.extend(build_lines_body(post_id, post))
+
+#         for comment_id, comment in post['tokenized']['comments'].iteritems():
+#             if terms.intersection(set(comment['body'])):
+#                 lines.extend(build_lines_comment(post_id, comment_id, post))
+
+#     return lines 
 
 
-    print "\n\nwriting file %i...\n" % (files_written)
 
-    for line in find_mentions(terms, processed_dict):
-        sys.stdout.write('.')
-        sys.stdout.flush()
+# def dump_mentions_to_raw_text(terms, processed_dict, outdir):
+#     """
+#     load json from inpath
+#     for each post body, write line:
+#         UNIQQQID asdf3. <body>
+#     for each comment body, write line:
+#         UNIQQQID asdf3:sdfg4. <body>
+#     do batches of 100 bodies per file.
+#     """
 
-        if lines_written > 100:
-            outfile.close()
-            print "\n\nfile %i done.\n\n" % (files_written)
-            files_written += 1
-            lines_written  = 0
-            outfile = open(outdir + '/raw_bodies_%i.txt' % (files_written), 'wb')
-            print "\n\nwriting file %i... \n\n" % (files_written)
+#     outfile              = open(outdir + '/raw_bodies_1.txt', 'wb')
+#     lines_written        = 0
+#     files_written        = 1
+#     total_lines_written  = 0
 
-        outfile.write(line)
-        lines_written       += 1
-        total_lines_written += 1
 
-    print "\n\nwrote %i lines.\n\n" % (total_lines_written)
+#     print "\n\nwriting file %i...\n" % (files_written)
 
-    outfile.close()
+#     for line in find_mentions(terms, processed_dict):
+#         sys.stdout.write('.')
+#         sys.stdout.flush()
+
+#         if lines_written > 100:
+#             outfile.close()
+#             print "\n\nfile %i done.\n\n" % (files_written)
+#             files_written += 1
+#             lines_written  = 0
+#             outfile = open(outdir + '/raw_bodies_%i.txt' % (files_written), 'wb')
+#             print "\n\nwriting file %i... \n\n" % (files_written)
+
+#         outfile.write(line)
+#         lines_written       += 1
+#         total_lines_written += 1
+
+#     print "\n\nwrote %i lines.\n\n" % (total_lines_written)
+
+#     outfile.close()
 
 
 

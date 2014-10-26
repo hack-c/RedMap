@@ -10,14 +10,32 @@ from settings import text_columns
 from utils import tokenize
 
 
+class Submission(object):
+    """
+    Class for a Reddit post or comment.
+    Dictionary of values 
+    """
+    def __init__(self, praw_submission):
+        self.columns = config['columns']
+        self._populate(praw_submission)
+
+
+    def _populate(self, praw_submission):
+        """
+        populate the dict containing post data
+        """
+        self.dict = {col: getattr(praw_submission, col, None) for col in self.columns}
+        self.dict['subreddit'] = praw_submission.subreddit.title
+
+
 class RedditClient(object):
     """
     Base class for interacting with the Reddit API.
     """
     def __init__(self):
-        self.user_agent = config['user_agent']
-        self.limit      = config['limit']
-        self.subreddits = config['subreddits']
+        self.user_agent  = config['user_agent']
+        self.limit       = config['limit']
+        self.subreddits  = config['subreddits']
         self._connect()
 
     def _connect(self):
@@ -49,8 +67,8 @@ class RedditCollection(RedditClient):
         WARNING: this can take a long ass time 
         """
         if subreddits:
-            self.subreddits     = subreddits
-            self.main_subreddit = subreddits[0]
+            self.subreddits      = subreddits
+            self.main_subreddit  = subreddits[0]
     
         posts = []
 
@@ -71,9 +89,9 @@ class RedditCollection(RedditClient):
 
             print "\ngot %i posts.\n\n" % (len(posts))
 
-        df       = pd.DataFrame(posts)
-        df.index = df.name
-        self.df  = df
+        df        = pd.DataFrame(posts)
+        df.index  = df.name
+        self.df   = df
 
         return self.df
 
@@ -94,6 +112,7 @@ class RedditCollection(RedditClient):
         self.fpath = self.build_fpath()
 
         fpath = 'data/raw/' + self.fpath + '.pkl'
+        
         print "\n\nsaving to %s..."  % (fpath)
 
         self.df.to_pickle(fpath)
@@ -104,6 +123,8 @@ class RedditCollection(RedditClient):
         read from pickle
         """
         assert os.path.exists(fpath)
+
+        print "\n\nreading pickle from %s..." % (fpath)
 
         self.df = pd.io.pickle.read_pickle(fpath)
 
@@ -186,14 +207,14 @@ class RedditCollection(RedditClient):
         """
         compute document similarities between main_subreddit and the rest
         """
-        vec_bow = self.dictionary.doc2bow(self.docs_dict[main_subreddit])
-        vec_lsi = self.lsi[vec_bow]
-        index   = gensim.similarities.MatrixSimilarity(corpus_lsi)    
+        vec_bow  = self.dictionary.doc2bow(self.docs_dict[main_subreddit])
+        vec_lsi  = self.lsi[vec_bow]
+        index    = gensim.similarities.MatrixSimilarity(corpus_lsi)    
 
         index.save('data/processed/' + self.fpath + '_lsi.index')
 
-        sims = index[vec_lsi]
-        sims = sorted(enumerate(sims), key=lambda item: -item[1])
+        sims  = index[vec_lsi]
+        sims  = sorted(enumerate(sims), key=lambda item: -item[1])
 
         similarity_map = {}
 
@@ -241,24 +262,6 @@ class RedditCollection(RedditClient):
             }
 
         json.dump(self.top_tfidf, 'data/processed/' + self.fpath + '_top_100_tfidf.json')
-
-
-class Submission(object):
-    """
-    Class for a Reddit post or comment.
-    Dictionary of values 
-    """
-    def __init__(self, praw_submission):
-        self.columns = config['columns']
-        self._populate(praw_submission)
-
-
-    def _populate(self, praw_submission):
-        """
-        populate the dict containing post data
-        """
-        self.dict = {col: getattr(praw_submission, col, None) for col in self.columns}
-        self.dict['subreddit'] = praw_submission.subreddit.title
 
 
 

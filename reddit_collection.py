@@ -122,7 +122,7 @@ class RedditCollection(RedditClient):
         return '%s_%i' % ('+'.join(self.subreddits), int(time.time()))
 
 
-    def pickle(self):
+    def pickle(self, suffix=''):
         """
         pickle the posts dataframe 
         """
@@ -130,7 +130,7 @@ class RedditCollection(RedditClient):
 
         self.fpath = self.build_fpath()
 
-        fpath = 'data/raw/' + self.fpath + '.pkl'
+        fpath = 'data/raw/' + self.fpath + suffix + '.pkl'
         
         print "\n\nsaving to %s..."  % (fpath)
 
@@ -258,7 +258,9 @@ class RedditCollection(RedditClient):
         corpus        = self.lsi_transform(self.tfidf_transform(self.build_corpus()))
         similarities  = self.compute_subreddit_similarities(self.main_subreddit, corpus) 
         
-        json.dump(similarities, 'data/processed/' + self.fpath + '_similarities.json')
+        fpath = 'data/processed/' + self.fpath + '_similarities.json'
+        print "\n\nsaving document similarities to %s." % fpath 
+        json.dump(similarities, open(fpath, 'wb'))
 
 
     def get_total_score(self, term):
@@ -272,7 +274,7 @@ class RedditCollection(RedditClient):
         """
         extract the top n highest-ranked terms from the tfidf model and their measures
         """
-        print "\n\nsaving most relevant tf-idf terms..."
+        print "\n\nprocessing tf-idf terms..."
         
         self.top_tfidf = {}
 
@@ -288,7 +290,9 @@ class RedditCollection(RedditClient):
                 } for x in top_n_terms
             }
 
-        json.dump(self.top_tfidf, 'data/processed/' + self.fpath + '_top_100_tfidf.json')
+        fpath = 'data/processed/' + self.fpath + '_top_%i_tfidf.json' % n
+        print "\n\nsaving tfidf terms to %s." % fpath
+        json.dump(self.top_tfidf, open(fpath, 'wb'))
 
 
     def find_occurrences(self, terms):
@@ -297,7 +301,6 @@ class RedditCollection(RedditClient):
         return df containing only rows where a term in terms is mentioned
         """
         return self.df[self.df['tokens'].apply(lambda t: bool(set(t) & set(terms) is not None))]
-
 
 
     def dump_occurences(self, subreddit=None):
@@ -327,7 +330,7 @@ class RedditCollection(RedditClient):
         fpath       = "data/processed/" + self.fpath + "_parse_tree.json"
         
         print "\n\nsaving parse tree to %s..." % fpath
-        json.dump(parse_tree, fpath)
+        json.dump(parse_tree, open(fpath, 'wb'))
 
         return parse_tree
 
@@ -352,8 +355,8 @@ class RedditCollection(RedditClient):
         return a df mapping post id to 'main sentiment',
         i.e. sentimentValue for longest sentence in the post.
         """
-        df['name']    = get_row_ids(df)
-        df['length']  = get_sentence_length(df)
+        df['name']    = self.get_row_ids(df)
+        df['length']  = self.get_sentence_length(df)
 
         return df.groupby('name').apply(lambda subf: subf['sentimentValue'][subf['length'].idxmax()])
 
@@ -367,7 +370,7 @@ class RedditCollection(RedditClient):
         sentences_df    = pd.DataFrame(sentences)
         sentiments_map  = get_main_sentiments(sentences_df)
 
-        return self.df.apply(lambda s: sentiments_map.get(s.name, np.nan))
+        return self.df['name'].apply(lambda name: sentiments_map.get(name, np.nan))
 
 
     def get_mean_termwise_sentiment(self, term):
@@ -384,7 +387,7 @@ class RedditCollection(RedditClient):
         self.dump_occurences()
         parse_tree            = self.corenlp_batch_parse()
         self.df['sentiment']  = self.label_post_sentiments(parse_tree)
-        self.top_tfidf[self.main_subreddit]
+
 
 
 

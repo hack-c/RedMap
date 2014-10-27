@@ -7,6 +7,9 @@ config = {
     'columns': ['name','title','selftext','body','score','short_link','parent_id'],
 }
 
+corenlpdir = '../corenlp-python/stanford-corenlp-full-2014-08-27/'
+rawtextdir = 'data/raw/bodytext'
+
 text_columns = ['title','selftext','body']
 
 useless_words = {
@@ -36,7 +39,8 @@ useless_words = {
     'doesnt', 
     'dont', 
     'downvoting', 
-    'eating', 
+    'eating',
+    'endbody', # TODO: find a better way to do this... this is functioning as a special "STOP" character.
     'enough', 
     'even', 
     'every', 

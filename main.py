@@ -36,7 +36,9 @@ if __name__ == "__main__":
 
     r.preprocess()
     r.process_similarities()
-    r.process_top_tfidf()
+    r.process_sentiments()
+    r.process_top_tfidf(25)
+
 
 
 

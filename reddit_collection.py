@@ -1,12 +1,17 @@
 import sys
 import os 
+import json
 import time
 import praw
 import gensim
+import numpy as np 
 import pandas as pd
+from corenlp import batch_parse
 
 from settings import config
 from settings import text_columns
+from settings import corenlpdir
+from settings import rawtextdir
 from utils import remove_nonascii
 from utils import build_line
 from utils import tokenize
@@ -29,6 +34,18 @@ class Submission(object):
         self.dict = {col: getattr(praw_submission, col, None) for col in self.columns}
         self.dict['subreddit'] = praw_submission.subreddit.title
 
+
+class RNNParsedSentence(object):
+    """
+    Class for a sentence from the output of the Stanford CoreNLP Pipeline.
+    Currently using stanford-corenlp-full-2014-08-27
+    Path to that dir is in settings
+    """
+    def __init__(self, parsed_sentence):
+        self._populate(parsed_sentence)
+
+    def _populate(self, parsed_sentence):
+        self.dict = 
 
 class RedditClient(object):
     """
@@ -57,6 +74,7 @@ class RedditCollection(RedditClient):
         self.dictionary  = None
         self.tfidf       = None
         self.lsi         = None
+        self.parse_tree  = None
 
 
 
@@ -92,7 +110,6 @@ class RedditCollection(RedditClient):
             print "\ngot %i posts.\n\n" % (len(posts))
 
         df        = pd.DataFrame(posts)
-        df.index  = df.name
         self.df   = df
 
         return self.df
@@ -142,10 +159,11 @@ class RedditCollection(RedditClient):
 
         self.df['body'].fillna(self.df['selftext'], inplace=True)
         self.df['body']       = self.df['body'].apply (lambda x:  u'' if x is None else x)
-        self.df['title']      = self.df['title'].apply(lambda x:  u'' if x is None else x)y
+        self.df['title']      = self.df['title'].apply(lambda x:  u'' if x is None else x)
         self.df['body']       = self.df['body'].apply(remove_nonascii)
         self.df['title']      = self.df['body'].apply(remove_nonascii)
         self.df['subreddit']  = self.df['subreddit'].apply(unicode.lower)
+        self.df.index         = self.df['name']
         del self.df['selftext']
 
         for col in ('body', 'title'):
@@ -247,7 +265,7 @@ class RedditCollection(RedditClient):
         """
         sum the scores for posts and comments which mention term
         """
-        return self.df[self.df['tokens'].map(lambda x: term in x)]['score'].sum()
+        return self.df[self.df['tokens'].apply(lambda x: term in x)]['score'].sum()
 
 
     def process_top_tfidf(self, n):
@@ -266,34 +284,107 @@ class RedditCollection(RedditClient):
                 id2token[x[0]]: {
                     'tfidf': str(x[1]), 
                     'total_points': self.get_total_score(x),
-                    'sentiment': []
+                    'sentiment': self.get_mean_termwise_sentiment(id2token[x[0]])
                 } for x in top_n_terms
             }
 
         json.dump(self.top_tfidf, 'data/processed/' + self.fpath + '_top_100_tfidf.json')
 
 
-    def build_line(s):
+    def find_occurrences(self, terms):
         """
-        take in a series containing a single submission
-        format string to write for post body
+        take list-like of terms 
+        return df containing only rows where a term in terms is mentioned
         """
-        return "UNIQQQID " + s['name'] +  + remove_nonascii(s['body']) + "\n\n" if len(s['body']) > 10 else []
+        return self.df[self.df['tokens'].apply(lambda t: bool(set(t) & set(terms) is not None))]
 
 
-    def dump_occurences(self, subreddit):
+
+    def dump_occurences(self, subreddit=None):
         """
         find mentions of top ranked tfidf terms
         format and dump batchwise to text
         """
-        terms       = set(self.top_tfidf[subreddit].values())
-        occurences  = self.df[self.df['tokens'].apply(lambda t: set(t) & terms is not None)]
+        if subreddit is None:
+            subreddit = self.main_subreddit
+
+        terms       = self.top_tfidf[subreddit].values()
+        occurrences = self.find_occurrences(terms)
         lines       = occurences.apply(build_line, axis=1)
 
         dump_lines_to_text(lines)
 
 
+    def corenlp_batch_parse(self, rawtextdir=rawtextdir):
+        """
+        perform the batch parse on a directory full of text files, containing one "body" per line.
+        return a dict mapping unique ids to mean sentiments.
+        """    
+        
+        print "\n\ninitiating batch parse..."
+        parsed      = batch_parse(rawtextdir, corenlpdir)
+        parse_tree  = [x for x in parsed]
+        fpath       = "data/processed/" + self.fpath + "_parse_tree.json"
+        
+        print "\n\nsaving parse tree to %s..." % fpath
+        json.dump(parse_tree, fpath)
 
+        return parse_tree
+
+
+    def get_row_ids(self, df):
+        """
+        lable the rows with their corresponding reddit post id.
+        """
+        return df.apply(lambda s: s['text'][1] if s['text'][0] == "UNIQQQID" else np.nan, axis=1).fillna(method='ffill')
+
+
+    def get_sentence_length(self, df):
+        """
+        lable the rows with the length of the sentence in tokens.
+        """
+        return df['text'].apply(len)
+        
+
+    def get_main_sentiments(self, df):
+        """
+        group df rows by id
+        return a df mapping post id to 'main sentiment',
+        i.e. sentimentValue for longest sentence in the post.
+        """
+        df['name']    = get_row_ids(df)
+        df['length']  = get_sentence_length(df)
+
+        return df.groupby('name').apply(lambda subf: subf['sentimentValue'][subf['length'].idxmax()])
+
+
+    def label_post_sentiments(self, parse_tree):
+        """
+        take in the output of the batch_parse
+        return a df mapping post ids to the 'main' sentiment value
+        """
+        sentences       = list(itertools.chain.from_iterable([block['sentences'] for block in parse_tree]))
+        sentences_df    = pd.DataFrame(sentences)
+        sentiments_map  = get_main_sentiments(sentences_df)
+
+        return self.df.apply(lambda s: sentiments_map.get(s.name, np.nan))
+
+
+    def get_mean_termwise_sentiment(self, term):
+        """
+        compute the mean sentiment over submissions in which term occurs
+        """
+        return self.find_occurrences([term])['sentiment'].mean()
+
+
+    def process_sentiments(self):
+        """
+        sentiment pipeline
+        """
+        self.dump_occurences()
+        parse_tree            = self.corenlp_batch_parse()
+        self.df['sentiment']  = self.label_post_sentiments(parse_tree)
+        self.top_tfidf[self.main_subreddit]
 
 
 

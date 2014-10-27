@@ -8,8 +8,11 @@ def tokenize(raw_string):
     """
     take in a string, return a tokenized and normalized list of words
     """
+    if raw_string == '':
+        return u''
+    if not isinstance(raw_string, unicode):
+        raise TypeError("%s is not unicode." % raw_string)
     table = {ord(c): None for c in string.punctuation}
-    assert isinstance(raw_string, unicode), "'%s' is not a unicode." % raw_string
     return filter(
         lambda x: x not in settings.useless_words, 
         nltk.word_tokenize(raw_string.lower().translate(table))
@@ -41,7 +44,7 @@ def dump_lines_to_text(lines, outdir):
     files_written        = 1
     total_lines_written  = 0
 
-    print "\n\nwriting file %i..." % (files_written)
+    print "\n\nwriting file %i...\n" % (files_written)
 
     for line in lines:
         sys.stdout.write('.')
@@ -53,7 +56,7 @@ def dump_lines_to_text(lines, outdir):
             files_written += 1
             lines_written  = 0
             outfile = open(outdir + '/raw_bodies_%i.txt' % (files_written), 'wb')
-            print "\n\nwriting file %i..." % (files_written)
+            print "\n\nwriting file %i...\n" % (files_written)
 
         outfile.write(line)
         lines_written       += 1

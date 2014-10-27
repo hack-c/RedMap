@@ -31,21 +31,9 @@ class Submission(object):
         """
         populate the dict containing post data
         """
-        self.dict = {col: getattr(praw_submission, col, None) for col in self.columns}
+        self.dict = {col: getattr(praw_submission, col, np.nan) for col in self.columns}
         self.dict['subreddit'] = praw_submission.subreddit.title
 
-
-class RNNParsedSentence(object):
-    """
-    Class for a sentence from the output of the Stanford CoreNLP Pipeline.
-    Currently using stanford-corenlp-full-2014-08-27
-    Path to that dir is in settings
-    """
-    def __init__(self, parsed_sentence):
-        self._populate(parsed_sentence)
-
-    def _populate(self, parsed_sentence):
-        self.dict = 
 
 class RedditClient(object):
     """
@@ -77,7 +65,6 @@ class RedditCollection(RedditClient):
         self.parse_tree  = None
 
 
-
     def scrape(self, subreddits=None):
         """
         pulls down the limit of posts for each subreddit
@@ -93,24 +80,25 @@ class RedditCollection(RedditClient):
         posts = []
 
         for subred in self.subreddits:
-            print "\n\nfetching /r/%s ...\n" % (subred)
+            subred_posts = []
+            print "\n\nfetching /r/%s...\n" % (subred)
 
-            for p in self.reddit.get_subreddit(subred, fetch=True).get_hot(limit=self.limit):
-
+            for p in self.reddit.get_subreddit(subred).get_hot(limit=self.limit):
                 try:
                     sys.stdout.write('.')
                     sys.stdout.flush()
 
-                    posts.append(Submission(p).dict)
+                    subred_posts.append(Submission(p).dict)
                     p.replace_more_comments(limit=20)
-                    posts.extend([Submission(c).dict for c in praw.helpers.flatten_tree(p.comments)])
+                    subred_posts.extend([Submission(c).dict for c in praw.helpers.flatten_tree(p.comments)])
+
                 except Exception:
                     time.sleep(10)
 
-            print "\ngot %i posts.\n\n" % (len(posts))
+            posts.extend(subred_posts)            
+            print "\ngot %i posts.\n\n" % (len(subred_posts))
 
-        df        = pd.DataFrame(posts)
-        self.df   = df
+        self.df = pd.DataFrame(posts)
 
         return self.df
 
@@ -146,7 +134,8 @@ class RedditCollection(RedditClient):
 
         print "\n\nreading pickle from %s..." % (fpath)
 
-        self.df = pd.io.pickle.read_pickle(fpath)
+        self.subreddits  = self.fpath[:-15].split('+')  # also a hack
+        self.df          = pd.io.pickle.read_pickle(fpath)
 
 
     def preprocess(self):
@@ -157,9 +146,9 @@ class RedditCollection(RedditClient):
 
         print "\n\npreprocessing text..."
 
-        self.df['body'].fillna(self.df['selftext'], inplace=True)
-        self.df['body']       = self.df['body'].apply (lambda x:  u'' if x is None else x)
-        self.df['title']      = self.df['title'].apply(lambda x:  u'' if x is None else x)
+        self.df['body']       = self.df['body'].fillna(self.df['selftext'])
+        self.df['body']       = self.df['body'].fillna (u'')
+        self.df['title']      = self.df['title'].fillna(u'')
         self.df['body']       = self.df['body'].apply(remove_nonascii)
         self.df['title']      = self.df['body'].apply(remove_nonascii)
         self.df['subreddit']  = self.df['subreddit'].apply(unicode.lower)
@@ -170,6 +159,7 @@ class RedditCollection(RedditClient):
             self.df[col + '_tokens'] = self.df[col].apply(tokenize)
 
         self.df['tokens'] = [t + b for t,b in zip(self.df.body_tokens, self.df.title_tokens)]
+        print "\n\ndone."
 
 
     def get_subreddit_docs(self):
@@ -355,10 +345,11 @@ class RedditCollection(RedditClient):
         return a df mapping post id to 'main sentiment',
         i.e. sentimentValue for longest sentence in the post.
         """
-        df['name']    = self.get_row_ids(df)
-        df['length']  = self.get_sentence_length(df)
-
-        return df.groupby('name').apply(lambda subf: subf['sentimentValue'][subf['length'].idxmax()])
+        df['name']     = self.get_row_ids(df)
+        df['length']   = self.get_sentence_length(df)
+        sentiments_df  = df.groupby('name').apply(lambda subf: subf['sentimentValue'][subf['length'].idxmax()])
+        
+        return  dict(zip(sentiments_df['name'], sentiments_df['sentimentValue']))
 
 
     def label_post_sentiments(self, parse_tree):

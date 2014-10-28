@@ -288,13 +288,13 @@ class RedditCollection(RedditClient):
                 id2token[x[0]]: {
                     'tfidf': str(x[1]), 
                     'total_points': self.get_total_score(x),
-                    'sentiment': self.get_mean_termwise_sentiment(id2token[x[0]])
+                    'sentiment': None
                 } for x in top_n_terms
             }
 
-        fpath = 'data/processed/' + self.fpath + '_top_%i_tfidf.json' % n
-        print "\n\nsaving tfidf terms to %s." % fpath
-        json.dump(self.top_tfidf, open(fpath, 'wb'))
+        self.tfidf_fpath  = 'data/processed/' + self.fpath + '_top_%i_tfidf.json' % n
+
+        print "\n\ndone."
 
 
     def find_occurrences(self, terms):
@@ -302,7 +302,7 @@ class RedditCollection(RedditClient):
         take list-like of terms 
         return df containing only rows where a term in terms is mentioned
         """
-        return self.df[self.df['tokens'].apply(lambda t: bool(set(t) & set(terms) is not None))]
+        return self.df[self.df['tokens'].apply(lambda t: bool(set(t) & set(terms)))]
 
 
     def dump_occurences(self, subreddit=None):
@@ -310,6 +310,7 @@ class RedditCollection(RedditClient):
         find mentions of top ranked tfidf terms
         format and dump batchwise to text
         """
+        print "\n\nwriting file batch for CoreNLP pipeline..."
         if subreddit is None:
             subreddit = self.main_subreddit
 
@@ -376,6 +377,16 @@ class RedditCollection(RedditClient):
         return self.df['name'].apply(lambda name: sentiments_map.get(name, np.nan))
 
 
+    def label_term_sentiments(self):
+        """
+        take in json of top_tfidf 
+        """
+        for term in self.top_tfidf[self.main_subreddit].keys():
+            self.top_tfidf[self.main_subreddit][term]['sentiment'] = self.get_mean_termwise_sentiment(term)
+        
+        json.dump(self.top_tfidf, open(self.tfidf_fpath, 'wb'))
+
+
     def get_mean_termwise_sentiment(self, term):
         """
         compute the mean sentiment over submissions in which term occurs
@@ -390,6 +401,7 @@ class RedditCollection(RedditClient):
         self.dump_occurences()
         parse_tree            = self.corenlp_batch_parse()
         self.df['sentiment']  = self.label_post_sentiments(parse_tree)
+
 
 
     def patch_subreddit_title_display_name(self):

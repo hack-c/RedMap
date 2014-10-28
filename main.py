@@ -2,6 +2,7 @@ import time
 import argparse
 
 from reddit_collection import RedditCollection
+from settings import intro_text
 
 
 parser = argparse.ArgumentParser()
@@ -15,6 +16,8 @@ args = parser.parse_args()
 
 
 if __name__ == "__main__":
+
+    print intro_text
 
     r = RedditCollection()
 
@@ -36,8 +39,9 @@ if __name__ == "__main__":
 
     r.preprocess()
     r.process_similarities()
-    r.process_sentiments()
     r.process_top_tfidf(25)
+    r.process_sentiments()
+
 
 
 

@@ -278,12 +278,13 @@ class RedditCollection(RedditClient):
         """
         print "\n\nprocessing tf-idf terms..."
         
-        self.top_tfidf = {}
+        self.top_tfidf = pd.DataFrame()
 
         id2token = dict((v,k) for k,v in self.dictionary.token2id.iteritems())
 
         for i, doc in enumerate(self.corpus_tfidf):
             top_n_terms = sorted(doc, key=lambda item: item[1], reverse=True)[:n]
+
             self.top_tfidf[self.doc_map[i]] = {
                 id2token[x[0]]: {
                     'tfidf': str(x[1]), 
@@ -314,7 +315,7 @@ class RedditCollection(RedditClient):
         if subreddit is None:
             subreddit = self.main_subreddit
 
-        terms       = self.top_tfidf[subreddit].values()
+        terms       = self.top_tfidf[subreddit].keys()
         occurrences = self.find_occurrences(terms)
         lines       = occurences.apply(build_line, axis=1)
 

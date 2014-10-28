@@ -1,11 +1,12 @@
 import sys
 import os 
-import json
 import time
-import praw
-import gensim
+import json
+import itertools
 import numpy as np 
 import pandas as pd
+import gensim
+import praw
 from corenlp import batch_parse
 
 from settings import config
@@ -32,7 +33,7 @@ class Submission(object):
         populate the dict containing post data
         """
         self.dict = {col: getattr(praw_submission, col, np.nan) for col in self.columns}
-        self.dict['subreddit'] = praw_submission.subreddit.title
+        self.dict['subreddit'] = praw_submission.subreddit.display_name
 
 
 class RedditClient(object):
@@ -54,18 +55,29 @@ class RedditCollection(RedditClient):
     Scrapes Reddit and extracts structured post and comment text, 
     which can be normalized, parsed, annotated, and otherwise modeled.
     """
-    def __init__(self):
+    def __init__(self, posts_list=None, df=None):
         super(RedditCollection, self).__init__()
-        self.fpath       = None
-        self.df          = None
-        self.corpus      = None
-        self.dictionary  = None
-        self.tfidf       = None
-        self.lsi         = None
-        self.parse_tree  = None
+        self._populate(posts_list=posts_list, df=df)
 
 
-    def scrape(self, subreddits=None):
+    def _populate(self, posts_list=None, df=None, subreddits=None, fpath=None):
+        if posts_list is not None and df is not None:
+            raise AttributeError("Can't supply both raw posts_list and df.")
+        elif posts_list is not None:
+            self.df = posts_list
+        elif df is not None:
+            self.df = df
+        self.subreddits      = subreddits or config['subreddits']
+        self.main_subreddit  = self.subreddits[0]
+        self.fpath           = fpath
+        self.corpus          = None
+        self.dictionary      = None
+        self.tfidf           = None
+        self.lsi             = None
+        self.parse_tree      = None
+
+
+    def scrape(self, subreddits):
         """
         pulls down the limit of posts for each subreddit
         gets columns in config for each post or comment 
@@ -73,13 +85,11 @@ class RedditCollection(RedditClient):
 
         WARNING: this can take a long ass time 
         """
-        if subreddits:
-            self.subreddits = subreddits
-        self.main_subreddit = self.subreddits[0]
+        assert subreddits is not None, "Please specify subreddits."
     
         posts = []
 
-        for subred in self.subreddits:
+        for subred in subreddits:
             subred_posts = []
             print "\n\nfetching /r/%s...\n" % (subred)
 
@@ -98,9 +108,7 @@ class RedditCollection(RedditClient):
             posts.extend(subred_posts)            
             print "\ngot %i posts.\n\n" % (len(subred_posts))
 
-        self.df = pd.DataFrame(posts)
-
-        return self.df
+        self._populate(posts_list=posts, subreddits=subreddits)
 
 
     def build_fpath(self):
@@ -125,17 +133,19 @@ class RedditCollection(RedditClient):
         self.df.to_pickle(fpath)
 
 
-    def read_pickle(self, fpath):
+    def read_pickle(self, inpath):
         """
         read from pickle
         """
-        assert os.path.exists(fpath)
-        self.fpath = fpath.split('/')[-1][:-4]  # hack... but whatever
+        assert os.path.exists(inpath)
+        fpath = inpath.split('/')[-1][:-4]  # hack... but whatever
 
-        print "\n\nreading pickle from %s..." % (fpath)
+        print "\n\nreading pickle from %s..." % (inpath)
 
-        self.subreddits  = self.fpath[:-15].split('+')  # also a hack
-        self.df          = pd.io.pickle.read_pickle(fpath)
+        subreddits  = fpath[:-11].split('+')  # also a hack
+        df          = pd.io.pickle.read_pickle(inpath)
+        self._populate(df=df, subreddits=subreddits, fpath=fpath)
+        print "\n\ndone."
 
 
     def preprocess(self):
@@ -146,18 +156,16 @@ class RedditCollection(RedditClient):
 
         print "\n\npreprocessing text..."
 
-        self.df['body']       = self.df['body'].fillna(self.df['selftext'])
-        self.df['body']       = self.df['body'].fillna (u'')
-        self.df['title']      = self.df['title'].fillna(u'')
-        self.df['body']       = self.df['body'].apply(remove_nonascii)
-        self.df['title']      = self.df['body'].apply(remove_nonascii)
+        print "\n\nnormalizing..."
+        self.df['body']       = self.df['body'].fillna(self.df['selftext']).fillna(u'').apply(remove_nonascii)
+        self.df['title']      = self.df['title'].fillna(u'').apply(remove_nonascii)
         self.df['subreddit']  = self.df['subreddit'].apply(unicode.lower)
         self.df.index         = self.df['name']
         del self.df['selftext']
 
+        print "\n\ntokenizing..."
         for col in ('body', 'title'):
             self.df[col + '_tokens'] = self.df[col].apply(tokenize)
-
         self.df['tokens'] = [t + b for t,b in zip(self.df.body_tokens, self.df.title_tokens)]
         print "\n\ndone."
 
@@ -166,8 +174,8 @@ class RedditCollection(RedditClient):
         """
         return a dict mapping subreddit names to long lists of tokens
         """
-        docs_dict  = {subred: subr['tokens'].sum() for subr in [self.df[self.df.subreddit == subred] for subred in self.subreddits]}
-        doc_map    = dict(list(enumerate(docs_dict.keys()))) # later we'll need to know which numbered doc corresponds to which subreddit
+        docs_dict  = {subred: list(itertools.chain.from_iterable(subr['tokens'])) for subr in [self.df[self.df.subreddit == subred] for subred in self.subreddits]}
+        doc_map    = dict(list(enumerate(docs_dict.keys())))  # later we'll need to know which numbered doc corresponds to which subreddit
 
         return docs_dict, doc_map
 
@@ -176,22 +184,22 @@ class RedditCollection(RedditClient):
         """
         serialize and return gensim corpus of subreddit-documents
         """
+        print "\n\nbuilding corpus..."
         self.docs_dict, self.doc_map  = self.get_subreddit_docs()
         self.docs                     = self.docs_dict.values()
 
-        dictionary  = gensim.corpora.Dictionary(self.docs)
-        once_ids    = [tokenid for tokenid, docfreq in dictionary.dfs.iteritems() if docfreq == 1]
-        dictionary.filter_tokens(once_ids)   # remove tokens that only occur once 
-        dictionary.compactify()
-        dictionary.save('data/processed/' + self.fpath + '.dict')
-        self.dictionary = dictionary
+        print "\n\nbuilding dictionary..."
+        self.dictionary  = gensim.corpora.Dictionary(self.docs)
+        once_ids         = [tokenid for tokenid, docfreq in dictionary.dfs.iteritems() if docfreq == 1]
+        self.dictionary.filter_tokens(once_ids).compactify()   # remove tokens that only occur once 
+        self.dictionary.save('data/processed/' + self.fpath + '.dict')
 
-        corpus = [dictionary.doc2bow(doc) for doc in self.docs]
+        print "\n\nserializing corpus..."
+        corpus       = [dictionary.doc2bow(doc) for doc in self.docs]
+        gensim.corpora.MmCorpus.serialize('data/processed/' + self.fpath + '.mm', corpus)
+        self.corpus  = gensim.corpora.MmCorpus('data/processed/' + self.fpath + '.mm')
 
-        gensim.corpora.MmCorpus.serialize ('data/processed/' + self.fpath + '.mm', corpus)
-        corpus = gensim.corpora.MmCorpus  ('data/processed/' + self.fpath + '.mm')
-
-        self.corpus = corpus
+        print "\n\ndone."
 
         return corpus
 
@@ -200,9 +208,8 @@ class RedditCollection(RedditClient):
         """
         transform gensim corpus to normalized tf-idf
         """
-        tfidf              = gensim.models.TfidfModel(corpus, normalize=True)
-        self.tfidf         = tfidf 
-        self.corpus_tfidf  = tfidf[corpus]
+        self.tfidf         = gensim.models.TfidfModel(corpus, normalize=True)
+        self.corpus_tfidf  = self.tfidf[corpus]
 
         return self.corpus_tfidf
 
@@ -211,9 +218,8 @@ class RedditCollection(RedditClient):
         """
         fit lsi 
         """
-        lsi              = gensim.models.LsiModel(corpus, id2word=self.dictionary, num_topics=300)
-        self.lsi         = lsi
-        self.corpus_lsi  = lsi[corpus]
+        self.lsi         = gensim.models.LsiModel(corpus, id2word=self.dictionary, num_topics=300)
+        self.corpus_lsi  = self.lsi[corpus]
 
         return self.corpus_lsi
 

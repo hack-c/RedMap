@@ -9,7 +9,7 @@ def tokenize(raw_string):
     take in a string, return a tokenized and normalized list of words
     """
     if raw_string == '':
-        return u''
+        return [u'']
     if not isinstance(raw_string, unicode):
         raise TypeError("%s is not unicode." % raw_string)
     table = {ord(c): None for c in string.punctuation}
@@ -23,7 +23,8 @@ def remove_nonascii(s):
     """
     strip out nonascii chars
     """
-    return "".join(i for i in s if ord(i)<128)
+    table = {i: None for i in range(128,256)}
+    return s.translate(table)
 
 
 def build_line(s):

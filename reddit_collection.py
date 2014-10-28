@@ -167,6 +167,9 @@ class RedditCollection(RedditClient):
         for col in ('body', 'title'):
             self.df[col + '_tokens'] = self.df[col].apply(tokenize)
         self.df['tokens'] = [t + b for t,b in zip(self.df.body_tokens, self.df.title_tokens)]
+
+        self.patch_subreddit_title_display_name()  # TODO: remove!!
+
         print "\n\ndone."
 
 
@@ -174,10 +177,10 @@ class RedditCollection(RedditClient):
         """
         return a dict mapping subreddit names to long lists of tokens
         """
-        docs_dict  = {subred: list(itertools.chain.from_iterable(subr['tokens'])) for subr in [self.df[self.df.subreddit == subred] for subred in self.subreddits]}
-        doc_map    = dict(list(enumerate(docs_dict.keys())))  # later we'll need to know which numbered doc corresponds to which subreddit
+        docs_list  = [list(itertools.chain.from_iterable(subr['tokens'])) for subr in [self.df[self.df.subreddit == subred] for subred in self.subreddits]]
+        doc_map    = dict(list(enumerate(self.subreddits)))  # later we'll need to know which numbered doc corresponds to which subreddit
 
-        return docs_dict, doc_map
+        return docs_list, doc_map
 
 
     def build_corpus(self):
@@ -185,29 +188,30 @@ class RedditCollection(RedditClient):
         serialize and return gensim corpus of subreddit-documents
         """
         print "\n\nbuilding corpus..."
-        self.docs_dict, self.doc_map  = self.get_subreddit_docs()
-        self.docs                     = self.docs_dict.values()
+        self.docs_list, self.doc_map  = self.get_subreddit_docs()
 
         print "\n\nbuilding dictionary..."
-        self.dictionary  = gensim.corpora.Dictionary(self.docs)
-        once_ids         = [tokenid for tokenid, docfreq in dictionary.dfs.iteritems() if docfreq == 1]
-        self.dictionary.filter_tokens(once_ids).compactify()   # remove tokens that only occur once 
+        self.dictionary  = gensim.corpora.Dictionary(self.docs_list)
+        once_ids         = [tokenid for tokenid, docfreq in self.dictionary.dfs.iteritems() if docfreq == 1]
+        self.dictionary.filter_tokens(once_ids)  # remove tokens that only occur once 
+        self.dictionary.compactify()
         self.dictionary.save('data/processed/' + self.fpath + '.dict')
 
         print "\n\nserializing corpus..."
-        corpus       = [dictionary.doc2bow(doc) for doc in self.docs]
+        corpus       = [self.dictionary.doc2bow(doc) for doc in self.docs_list]
         gensim.corpora.MmCorpus.serialize('data/processed/' + self.fpath + '.mm', corpus)
         self.corpus  = gensim.corpora.MmCorpus('data/processed/' + self.fpath + '.mm')
 
         print "\n\ndone."
 
-        return corpus
+        return self.corpus
 
 
     def tfidf_transform(self, corpus):
         """
         transform gensim corpus to normalized tf-idf
         """
+        print "\n\ntransforming corpus to tfidf..."
         self.tfidf         = gensim.models.TfidfModel(corpus, normalize=True)
         self.corpus_tfidf  = self.tfidf[corpus]
 
@@ -218,6 +222,7 @@ class RedditCollection(RedditClient):
         """
         fit lsi 
         """
+        print "\n\nfitting lsi..."
         self.lsi         = gensim.models.LsiModel(corpus, id2word=self.dictionary, num_topics=300)
         self.corpus_lsi  = self.lsi[corpus]
 
@@ -228,7 +233,8 @@ class RedditCollection(RedditClient):
         """
         compute document similarities between main_subreddit and the rest
         """
-        vec_bow  = self.dictionary.doc2bow(self.docs_dict[main_subreddit])
+        print "\n\ncomputing /r/%s <--> /r/* similarities..." % main_subreddit
+        vec_bow  = self.dictionary.doc2bow(self.docs_list[0])
         vec_lsi  = self.lsi[vec_bow]
         index    = gensim.similarities.MatrixSimilarity(corpus_lsi)    
 
@@ -385,6 +391,14 @@ class RedditCollection(RedditClient):
         parse_tree            = self.corenlp_batch_parse()
         self.df['sentiment']  = self.label_post_sentiments(parse_tree)
 
+
+    def patch_subreddit_title_display_name(self):
+        """
+        this is a patch for data where the wrong subreddit name was scraped.
+        TODO: REMOVE!
+        """
+        subrmap = {u'financial news and views': u'finance', u'advanced fitness': u'advancedfitness'}
+        self.df['subreddit'] = self.df['subreddit'].apply(lambda s: subrmap.get(s, s))
 
 
 

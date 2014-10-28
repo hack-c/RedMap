@@ -13,6 +13,7 @@ rawtextdir = 'data/raw/bodytext'
 text_columns = ['title','selftext','body']
 
 useless_words = {
+    '',
     '1', 
     '2', 
     '3', 

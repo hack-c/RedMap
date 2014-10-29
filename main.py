@@ -3,7 +3,7 @@ import argparse
 import logging
 import json
 
-from reddit_collection import RedditCollection
+from reddit_collection import RedMap
 from settings import intro_text
 
 
@@ -26,7 +26,7 @@ if __name__ == "__main__":
 
     print intro_text
 
-    r = RedditCollection()
+    r = RedMap()
 
     if args.subreddit is not None:
         subreddits = args.subreddit.split('+')

@@ -51,13 +51,13 @@ class RedditClient(object):
         self.reddit = praw.Reddit(user_agent=self.user_agent)
 
 
-class RedditCollection(RedditClient):
+class RedMap(RedditClient):
     """
     Scrapes Reddit and extracts structured post and comment text, 
     which can be normalized, parsed, annotated, and otherwise modeled.
     """
     def __init__(self, posts_list=None, df=None):
-        super(RedditCollection, self).__init__()
+        super(RedMap, self).__init__()
         self._populate(posts_list=posts_list, df=df)
 
 

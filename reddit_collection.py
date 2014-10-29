@@ -279,22 +279,20 @@ class RedditCollection(RedditClient):
         """
         print "\n\nprocessing tf-idf terms..."
         
-        self.top_tfidf = pd.DataFrame()
-
         id2token = dict((v,k) for k,v in self.dictionary.token2id.iteritems())
 
+        rows = []
+
         for i, doc in enumerate(self.corpus_tfidf):
-            top_n_terms = sorted(doc, key=lambda item: item[1], reverse=True)[:n]
+            for term in sorted(doc, key=lambda item: item[1], reverse=True)[:n]:
+                rows.append({'term': id2token[term[0]], 
+                             'tfidf': str(term[1]), 
+                             'total_points': self.get_total_score(term),
+                             'subreddit': self.doc_map[i]})
 
-            self.top_tfidf[self.doc_map[i]] = {
-                id2token[x[0]]: {
-                    'tfidf': str(x[1]), 
-                    'total_points': self.get_total_score(x),
-                    'sentiment': None
-                } for x in top_n_terms
-            }
 
-        self.tfidf_fpath  = 'data/processed/' + self.fpath + '_top_%i_tfidf.json' % n
+        self.top_tfidf    = pd.DataFrame(rows)
+        self.tfidf_fpath  = 'data/processed/' + self.fpath + '_top_%i_tfidf.pkl' % n
 
         print "\n\ndone."
 
@@ -316,11 +314,11 @@ class RedditCollection(RedditClient):
         if subreddit is None:
             subreddit = self.main_subreddit
 
-        terms       = self.top_tfidf[subreddit].keys()
+        terms       = self.top_tfidf[self.top_tfidf['subreddit'] == subreddit]['term']
         occurrences = self.find_occurrences(terms)
         lines       = occurrences.apply(build_line, axis=1)
 
-        dump_lines_to_text(lines)
+        dump_lines_to_text(lines, rawtextdir)
 
 
     def corenlp_batch_parse(self, rawtextdir=rawtextdir):
@@ -383,11 +381,9 @@ class RedditCollection(RedditClient):
         """
         take in json of top_tfidf 
         """
-        for term in self.top_tfidf[self.main_subreddit].keys():
-            self.top_tfidf[self.main_subreddit][term]['sentiment'] = self.get_mean_termwise_sentiment(term)
+        self.top_tfidf['sentiment'] = self.top_tfidf[self.top_tfidf['subreddit'] == self.main_subreddit]['term'].apply(self.get_mean_termwise_sentiment)
+        pd.io.pickle.to_pickle(self.top_tfidf, self.tfidf_fpath)
         
-        json.dump(self.top_tfidf, open(self.tfidf_fpath, 'wb'))
-
 
     def get_mean_termwise_sentiment(self, term):
         """

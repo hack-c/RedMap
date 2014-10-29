@@ -1,8 +1,12 @@
 import time
 import argparse
+import logging
 
 from reddit_collection import RedditCollection
 from settings import intro_text
+
+
+logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
 
 parser = argparse.ArgumentParser()

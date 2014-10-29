@@ -18,7 +18,7 @@ parser.add_argument("-r", "--subreddit", help="specify subreddits delimited by +
 parser.add_argument("-p", "--pickle", help="path to pickled df",
                     action="store")
 parser.add_argument("-t" , "--parse-tree", help="path to json output of corenlp batch_parse",
-                    action="store")
+                    action="store_true")
 args = parser.parse_args()
 
 
@@ -40,7 +40,7 @@ if __name__ == "__main__":
 
     elif args.parse_tree is not None and args.pickle is not None:
         r.read_pickle(args.pickle)
-        parse_tree = json.load(open(args.parse_tree, 'rb'))
+        parse_tree = r.read_parse_tree()
 
     elif args.pickle is not None:
         r.read_pickle(args.pickle)

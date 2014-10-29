@@ -149,15 +149,17 @@ class RedMap(RedditClient):
         print "\n\ndone."
 
 
-    def read_parse_tree(self, inpath):
+    def read_parse_tree(self):
         """
         read json output from preprocessed corenlp batch_parse
         """
-        assert os.path.exists(inpath)
-        print "\n\nreading json from %s..." % (inpath)
-        with open(inpath, 'rb') as jsonfile:
+        treepath = "data/processed/" + self.fpath + "_parse_tree.json"
+        assert os.path.exists(treepath), "no parse tree here: %s" % treepath
+        print "\n\nreading json from %s..." % (treepath)
+        with open(treepath, 'rb') as jsonfile:
             parse_tree = json.load(jsonfile)
-            return parse_tree
+
+        return parse_tree
 
 
     def preprocess(self):
@@ -169,10 +171,12 @@ class RedMap(RedditClient):
         print "\n\npreprocessing text..."
 
         print "\n\nnormalizing..."
-        self.df['body']       = self.df['body'].fillna(self.df['selftext']).fillna(u'').apply(remove_nonascii)
-        self.df['title']      = self.df['title'].fillna(u'').apply(remove_nonascii)
-        self.df['subreddit']  = self.df['subreddit'].apply(unicode.lower)
-        self.df.index         = self.df['name']
+        self.df['body']        = self.df['body'].fillna(self.df['selftext']).fillna(u'').apply(remove_nonascii)
+        self.df['title']       = self.df['title'].fillna(u'').apply(remove_nonascii)
+        self.df['subreddit']   = self.df['subreddit'].apply(unicode.lower)
+        self.df['norm_score']  = self.normalize_score(self.df['score'])
+        self.df['exp_score']   = self.df['norm_score'].apply(np.exp)
+        self.df.index          = self.df['name']
         del self.df['selftext']
 
         print "\n\ntokenizing..."
@@ -180,7 +184,7 @@ class RedMap(RedditClient):
             self.df[col + '_tokens'] = self.df[col].apply(tokenize)
         self.df['tokens'] = [t + b for t,b in zip(self.df.body_tokens, self.df.title_tokens)]
 
-        self.patch_subreddit_title_display_name()  # TODO: remove!!
+        self._patch_subreddit_title_display_name()  # TODO: remove!!
 
         print "\n\ndone."
 
@@ -274,14 +278,22 @@ class RedMap(RedditClient):
         
         fpath = 'data/processed/' + self.fpath + '_similarities.json'
         print "\n\nsaving document similarities to %s." % fpath 
-        json.dump(similarities, open(fpath, 'wb'))
+        with open(fpath, 'wb') as similaritiesfile:
+            json.dump(similarities, similaritiesfile)
 
 
     def get_total_score(self, term):
         """
         sum the scores for posts and comments which mention term
         """
-        return self.df[self.df['tokens'].apply(lambda x: term in x)]['score'].sum()
+        return self.find_occurrences([term])['score'].sum()
+
+
+    def get_total_exp_score(self, term):
+        """
+        sum the exp_scores for posts and comments which mention term
+        """
+        return self.find_occurrences([term])['exp_score'].sum()
 
 
     def process_top_tfidf(self, n):
@@ -309,17 +321,21 @@ class RedMap(RedditClient):
         print "\n\ndone."
 
 
-    def find_occurrences(self, terms):
+    def find_occurrences(self, terms, nonzero_score=False):
         """
         take list-like of terms 
         return df containing only rows where a term in terms is mentioned
         """
-        return self.df[self.df['tokens'].apply(lambda t: bool(set(t) & set(terms)))]
+        if nonzero_score:
+            return self.df[(self.df['tokens'].apply(lambda t: bool(set(t) & set(terms)))) & (self.df['score'] != 0)]
+        else:
+            return self.df[self.df['tokens'].apply(lambda t: bool(set(t) & set(terms)))]
 
 
     def dump_occurrences(self, subreddit=None):
         """
         find mentions of top ranked tfidf terms
+        exclude mentions with zero score
         format and dump batchwise to text
         """
         print "\n\nwriting file batch for CoreNLP pipeline..."
@@ -327,7 +343,7 @@ class RedMap(RedditClient):
             subreddit = self.main_subreddit
 
         terms       = self.top_tfidf[self.top_tfidf['subreddit'] == subreddit]['term']
-        occurrences = self.find_occurrences(terms)
+        occurrences = self.find_occurrences(terms, nonzero_score=True)
         lines       = occurrences.apply(build_line, axis=1)
 
         dump_lines_to_text(lines, rawtextdir)
@@ -345,7 +361,8 @@ class RedMap(RedditClient):
         fpath       = "data/processed/" + self.fpath + "_parse_tree.json"
         
         print "\n\nsaving parse tree to %s..." % fpath
-        json.dump(parse_tree, open(fpath, 'wb'))
+        with open(fpath, 'wb') as parsetreefile:
+            json.dump(parse_tree, parsetreefile)
         print "\n\ndone."
 
         return parse_tree
@@ -395,17 +412,34 @@ class RedMap(RedditClient):
         take in json of top_tfidf 
         """
         print "\n\nextracting sentiments and annotating terms..."
-        self.top_tfidf['sentiment'] = self.top_tfidf[self.top_tfidf['subreddit'] == self.main_subreddit]['term'].apply(self.get_mean_termwise_sentiment)
+        self.top_tfidf['sentiment']  = self.top_tfidf[self.top_tfidf['subreddit'] == self.main_subreddit]['term'].apply(self.get_mean_termwise_sentiment)
         print "\n\npickling top_tfidf..."
         pd.io.pickle.to_pickle(self.top_tfidf, self.tfidf_fpath)
         print "\n\ndone."
+
+
+    def normalize_score(self, score_series):
+        """
+        normalize the scores to [-1,1]
+        """
+        neg_scores      = score_series[score_series < 0]
+        pos_scores      = score_series[score_series >= 0]
+        assert len(neg_scores) + len(pos_scores) == len(score_series)
+
+        neg_score_range = float(neg_scores.max() - neg_scores.min())
+        pos_score_range = float(pos_scores.max() - pos_scores.min())
+
+        return score_series.apply(lambda s: s / neg_score_range if s < 0 else s / pos_score_range)
         
 
     def get_mean_termwise_sentiment(self, term):
         """
         compute the mean sentiment over submissions in which term occurs
         """
-        return self.find_occurrences([term])['sentiment'].mean()
+        term_subframe     = self.find_occurrences([term], nonzero_score=True)
+        weighted_sents    = term_subframe.apply(lambda s: s['sentiment']*s['exp_score'], axis=1)
+        weights           = term_subframe['exp_score']
+        return weighted_sents.sum() / weights.sum()
 
 
     def process_sentiments(self, premade_tree=None):
@@ -419,7 +453,7 @@ class RedMap(RedditClient):
 
 
 
-    def patch_subreddit_title_display_name(self):
+    def _patch_subreddit_title_display_name(self):
         """
         this is a patch for data where the wrong subreddit name was scraped.
         TODO: REMOVE!

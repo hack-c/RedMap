@@ -149,6 +149,17 @@ class RedditCollection(RedditClient):
         print "\n\ndone."
 
 
+    def read_parse_tree(self, inpath):
+        """
+        read json output from preprocessed corenlp batch_parse
+        """
+        assert os.path.exists(inpath)
+        print "\n\nreading json from %s..." % (inpath)
+        with open(inpath, 'rb') as jsonfile:
+            parse_tree = json.load(jsonfile)
+            return parse_tree
+
+
     def preprocess(self):
         """
         tokenize text_columns and sum, dump to new tokens column 
@@ -335,6 +346,7 @@ class RedditCollection(RedditClient):
         
         print "\n\nsaving parse tree to %s..." % fpath
         json.dump(parse_tree, open(fpath, 'wb'))
+        print "\n\ndone."
 
         return parse_tree
 
@@ -359,11 +371,11 @@ class RedditCollection(RedditClient):
         return a df mapping post id to 'main sentiment',
         i.e. sentimentValue for longest sentence in the post.
         """
-        df['name']     = self.get_row_ids(df)
-        df['length']   = self.get_sentence_length(df)
-        sentiments_df  = df.groupby('name').apply(lambda subf: subf['sentimentValue'][subf['length'].idxmax()])
+        df['name']    = self.get_row_ids(df)
+        df['length']  = self.get_sentence_length(df)
+        sentiments    = df.groupby('name').apply(lambda subf: subf['sentimentValue'][subf['length'].idxmax()])
         
-        return  dict(zip(sentiments_df['name'], sentiments_df['sentimentValue']))
+        return  dict(zip(sentiments.index, sentiments))
 
 
     def label_post_sentiments(self, parse_tree):
@@ -373,7 +385,7 @@ class RedditCollection(RedditClient):
         """
         sentences       = list(itertools.chain.from_iterable([block['sentences'] for block in parse_tree]))
         sentences_df    = pd.DataFrame(sentences)
-        sentiments_map  = get_main_sentiments(sentences_df)
+        sentiments_map  = self.get_main_sentiments(sentences_df)
 
         return self.df['name'].apply(lambda name: sentiments_map.get(name, np.nan))
 
@@ -382,8 +394,11 @@ class RedditCollection(RedditClient):
         """
         take in json of top_tfidf 
         """
+        print "\n\nextracting sentiments and annotating terms..."
         self.top_tfidf['sentiment'] = self.top_tfidf[self.top_tfidf['subreddit'] == self.main_subreddit]['term'].apply(self.get_mean_termwise_sentiment)
+        print "\n\npickling top_tfidf..."
         pd.io.pickle.to_pickle(self.top_tfidf, self.tfidf_fpath)
+        print "\n\ndone."
         
 
     def get_mean_termwise_sentiment(self, term):
@@ -393,13 +408,14 @@ class RedditCollection(RedditClient):
         return self.find_occurrences([term])['sentiment'].mean()
 
 
-    def process_sentiments(self):
+    def process_sentiments(self, premade_tree=None):
         """
         sentiment pipeline
         """
         self.dump_occurrences()
-        parse_tree            = self.corenlp_batch_parse()
+        parse_tree            = premade_tree if premade_tree is not None else self.corenlp_batch_parse()
         self.df['sentiment']  = self.label_post_sentiments(parse_tree)
+        self.label_term_sentiments()
 
 
 

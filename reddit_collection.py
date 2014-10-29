@@ -13,6 +13,7 @@ from settings import config
 from settings import text_columns
 from settings import corenlpdir
 from settings import rawtextdir
+from utils import dump_lines_to_text
 from utils import remove_nonascii
 from utils import build_line
 from utils import tokenize
@@ -306,7 +307,7 @@ class RedditCollection(RedditClient):
         return self.df[self.df['tokens'].apply(lambda t: bool(set(t) & set(terms)))]
 
 
-    def dump_occurences(self, subreddit=None):
+    def dump_occurrences(self, subreddit=None):
         """
         find mentions of top ranked tfidf terms
         format and dump batchwise to text
@@ -317,7 +318,7 @@ class RedditCollection(RedditClient):
 
         terms       = self.top_tfidf[subreddit].keys()
         occurrences = self.find_occurrences(terms)
-        lines       = occurences.apply(build_line, axis=1)
+        lines       = occurrences.apply(build_line, axis=1)
 
         dump_lines_to_text(lines)
 
@@ -399,7 +400,7 @@ class RedditCollection(RedditClient):
         """
         sentiment pipeline
         """
-        self.dump_occurences()
+        self.dump_occurrences()
         parse_tree            = self.corenlp_batch_parse()
         self.df['sentiment']  = self.label_post_sentiments(parse_tree)
 

@@ -12,6 +12,8 @@ rawtextdir = 'data/raw/bodytext'
 
 text_columns = ['title','selftext','body']
 
+nonascii_table = {i: None for i in range(128,65375)}
+
 intro_text = """
 __________           .___ _____                 
 \______   \ ____   __| _//     \ _____  ______  

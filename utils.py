@@ -24,8 +24,7 @@ def remove_nonascii(s):
     """
     strip out nonascii chars
     """
-    table = {i: None for i in range(128,256)}
-    return s.translate(table)
+    return s.translate(settings.nonascii_table)
 
 
 def build_line(s):

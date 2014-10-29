@@ -285,11 +285,12 @@ class RedditCollection(RedditClient):
 
         for i, doc in enumerate(self.corpus_tfidf):
             for term in sorted(doc, key=lambda item: item[1], reverse=True)[:n]:
+                sys.stdout.write('.')
+                sys.stdout.flush()
                 rows.append({'term': id2token[term[0]], 
                              'tfidf': str(term[1]), 
                              'total_points': self.get_total_score(term),
                              'subreddit': self.doc_map[i]})
-
 
         self.top_tfidf    = pd.DataFrame(rows)
         self.tfidf_fpath  = 'data/processed/' + self.fpath + '_top_%i_tfidf.pkl' % n

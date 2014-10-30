@@ -1,4 +1,7 @@
 import nltk
+import string
+
+version = "0.0.1"
 
 config = {
     'user_agent': "comment grabber for a data visualization by /u/charliehack",
@@ -24,8 +27,9 @@ __________           .___ _____
         \/     \/     \/       \/     \/|__|    
 
 by Charlie Hack
-version 1.0        
-"""
+version %s
+""" % version
+
 
 useless_words = {
     '',

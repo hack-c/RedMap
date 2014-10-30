@@ -286,14 +286,14 @@ class RedMap(RedditClient):
         """
         sum the scores for posts and comments which mention term
         """
-        return self.find_occurrences([term])['score'].sum()
+        return self.find_occurrences([term], self.df)['score'].sum()
 
 
     def get_total_exp_score(self, term):
         """
         sum the exp_scores for posts and comments which mention term
         """
-        return self.find_occurrences([term])['exp_score'].sum()
+        return self.find_occurrences([term], self.df)['exp_score'].sum()
 
 
     def process_top_tfidf(self, n):
@@ -321,7 +321,7 @@ class RedMap(RedditClient):
         print "\n\ndone."
 
 
-    def find_occurrences(self, terms, df=self.df, field='tokens', nonzero_score=False):
+    def find_occurrences(self, terms, df, field='tokens', nonzero_score=False):
         """
         take list-like of terms 
         return df containing only rows where a term in terms is mentioned
@@ -343,7 +343,7 @@ class RedMap(RedditClient):
             subreddit = self.main_subreddit
 
         terms       = self.top_tfidf[self.top_tfidf['subreddit'] == subreddit]['term']
-        occurrences = self.find_occurrences(terms, nonzero_score=True)
+        occurrences = self.find_occurrences(terms, self.df, nonzero_score=True)
         lines       = occurrences.apply(build_line, axis=1)
 
         dump_lines_to_text(lines, rawtextdir)
@@ -436,7 +436,7 @@ class RedMap(RedditClient):
         """
         compute the mean sentiment over submissions in which term occurs
         """
-        term_subframe     = self.find_occurrences([term], nonzero_score=True)
+        term_subframe     = self.find_occurrences([term], self.df, nonzero_score=True)
         weighted_sents    = term_subframe.apply(lambda s: s['sentiment']*s['exp_score'], axis=1)
         weights           = term_subframe['exp_score']
         return weighted_sents.sum() / weights.sum()

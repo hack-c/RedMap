@@ -382,7 +382,7 @@ class RedMap(RedditClient):
         return df['text'].apply(len)
         
 
-    def get_main_sentiments(self, df, terms):
+    def get_main_sentiments(self, df):
         """
         group df rows by id
         return a df mapping post id to 'main sentiment',

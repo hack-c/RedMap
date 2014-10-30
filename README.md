@@ -5,9 +5,10 @@ __________           .___ _____
  |    |   \  ___// /_/ /    Y    \/ __ \|  |_> >
  |____|_  /\___  >____ \____|__  (____  /   __/ 
         \/     \/     \/       \/     \/|__|    
-```
+
 by Charlie Hack
 version 0.0.1 
+```
 
 
 Introduction
@@ -27,14 +28,12 @@ information in a beautiful and intuitive way in the browser.
 
 
 Usage
-_____
+-----
 Run `python main.py` with:
-    • an `-s` flag to scrape new data from Reddit (this can take a while);
-    • combined with an `-r` flag to specify the desired subreddits, which 
-      takes arguments in the form
-        `python main.py -s -r funny+askscience+business`
-    • you can also specify paths to pre-scraped data or pre-processed CoreNLP
-      batch-parse output json.
+* an `-s` flag to scrape new data from Reddit (this can take a while);
+* combined with an `-r` flag to specify the desired subreddits, which takes arguments in the form
+    `python main.py -s -r funny+askscience+business`
+* you can also specify paths to pre-scraped data or pre-processed CoreNLP batch-parse output json.
 
 
 Installation

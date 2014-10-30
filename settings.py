@@ -13,6 +13,7 @@ rawtextdir = 'data/raw/bodytext'
 text_columns = ['title','selftext','body']
 
 nonascii_table = {i: None for i in range(128,65375)}
+punctuation_table = {ord(c): None for c in string.punctuation}
 
 intro_text = """
 __________           .___ _____                 

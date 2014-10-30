@@ -321,15 +321,15 @@ class RedMap(RedditClient):
         print "\n\ndone."
 
 
-    def find_occurrences(self, terms, nonzero_score=False):
+    def find_occurrences(self, terms, df=self.df, field='tokens', nonzero_score=False):
         """
         take list-like of terms 
         return df containing only rows where a term in terms is mentioned
         """
         if nonzero_score:
-            return self.df[(self.df['tokens'].apply(lambda t: bool(set(t) & set(terms)))) & (self.df['score'] != 0)]
+            return df[(df[field].apply(lambda t: bool(set(t) & set(terms)))) & (df['score'] != 0)]
         else:
-            return self.df[self.df['tokens'].apply(lambda t: bool(set(t) & set(terms)))]
+            return df[df[field].apply(lambda t: bool(set(t) & set(terms)))]
 
 
     def dump_occurrences(self, subreddit=None):
@@ -382,7 +382,7 @@ class RedMap(RedditClient):
         return df['text'].apply(len)
         
 
-    def get_main_sentiments(self, df):
+    def get_main_sentiments(self, df, terms):
         """
         group df rows by id
         return a df mapping post id to 'main sentiment',
@@ -391,7 +391,7 @@ class RedMap(RedditClient):
         df['name']    = self.get_row_ids(df)
         df['length']  = self.get_sentence_length(df)
         sentiments    = df.groupby('name').apply(lambda subf: subf['sentimentValue'][subf['length'].idxmax()])
-        
+
         return  dict(zip(sentiments.index, sentiments))
 
 

@@ -13,10 +13,9 @@ def tokenize(raw_string):
         return [u'']
     if not isinstance(raw_string, unicode):
         raise TypeError("%s is not unicode." % raw_string)
-    table = {ord(c): None for c in string.punctuation}
     return filter(
         lambda x: x not in settings.useless_words, 
-        nltk.word_tokenize(raw_string.lower().translate(table))
+        nltk.word_tokenize(raw_string.lower().translate(settings.punctuation_table))
     )
 
 

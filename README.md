@@ -29,14 +29,14 @@ information in a beautiful and intuitive way in the browser.
 
 Usage
 -----
-Run `python main.py` with:  
+Run `python main.py` with:
 
-* an `-s` flag to scrape new data from Reddit (this can take a while)
-* combined with an `-r` flag to specify the desired subreddits, which takes arguments in the form  
+*  an `-s` flag to scrape new data from Reddit (this can take a while)
+*  combined with an `-r` flag to specify the desired subreddits, which takes arguments in the form  
 
 `python main.py -s -r funny+askscience+business`
 
-* you can also specify paths to pre-scraped data or pre-processed CoreNLP batch-parse output json.
+*  you can also specify paths to pre-scraped data or pre-processed CoreNLP batch-parse output json.
 
 
 Installation

@@ -50,7 +50,7 @@ in.) I'm using version 3.4.1; here's a download [link](http://nlp.stanford.edu/s
 
 There is also a slight modification that must be made to the corenlp wrapper library.
 
-I'll include the diff here for convenience. I've submitted an issue to their [Bitbucket](https://bitbucket.org/torotoki/corenlp-python/issue/15/keyerror-on-namedentitytag-and-lemma-when)
+I'll include the diff here for convenience. I've submitted an issue to their [Bitbucket](https://bitbucket.org/torotoki/corenlp-python/issue/15/keyerror-on-namedentitytag-and-lemma-when).
 
 ```
 diff --git a/corenlp/corenlp.py b/corenlp/corenlp.py

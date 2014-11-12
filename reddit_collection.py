@@ -65,7 +65,7 @@ class RedMap(RedditClient):
         if posts_list is not None and df is not None:
             raise AttributeError("Can't supply both raw posts_list and df.")
         elif posts_list is not None:
-            self.df = posts_list
+            self.df = pd.DataFrame(posts_list)
         elif df is not None:
             self.df = df
         self.subreddits      = subreddits or config['subreddits']
@@ -345,6 +345,8 @@ class RedMap(RedditClient):
         terms       = self.top_tfidf[self.top_tfidf['subreddit'] == subreddit]['term']
         occurrences = self.find_occurrences(terms, self.df, nonzero_score=True)
         lines       = occurrences.apply(build_line, axis=1)
+
+        rawtextdir  = rawtextdir + '/' + self.fpath
 
         dump_lines_to_text(lines, rawtextdir)
 
